@@ -166,13 +166,17 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
         """Handle API requests using the backend Lambda"""
         
         # Read request body for POST requests
-        body = ''
+        body = b''
         if method == 'POST':
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 0:
                 body = self.rfile.read(content_length)
         
-        # Build Lambda event
+        # Build Lambda event with proper headers
+        headers_dict = {}
+        for header_name, header_value in self.headers.items():
+            headers_dict[header_name.lower()] = header_value
+        
         event = {
             'requestContext': {
                 'http': {
@@ -180,7 +184,7 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
                 }
             },
             'rawPath': path,
-            'headers': dict(self.headers),
+            'headers': headers_dict,
             'queryStringParameters': {k: v[0] for k, v in (query_params or {}).items()},
             'body': base64.b64encode(body).decode() if body else '',
             'isBase64Encoded': bool(body)
@@ -197,9 +201,9 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         
         # Send body
-        body = response.get('body', '')
-        if isinstance(body, str):
-            self.wfile.write(body.encode())
+        response_body = response.get('body', '')
+        if isinstance(response_body, str):
+            self.wfile.write(response_body.encode())
     
     def log_message(self, format, *args):
         """Override to reduce log noise"""

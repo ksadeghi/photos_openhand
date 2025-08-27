@@ -154,29 +154,46 @@ def upload_picture(event):
         # Parse the multipart form data
         content_type = event.get('headers', {}).get('content-type', '')
         
+        print(f"Upload request - Content-Type: {content_type}")
+        
         if 'multipart/form-data' not in content_type:
             return error_response(400, 'Content-Type must be multipart/form-data')
         
         # Decode the body
         body = event.get('body', '')
         if event.get('isBase64Encoded', False):
-            body = base64.b64decode(body)
+            try:
+                body = base64.b64decode(body)
+            except Exception as e:
+                return error_response(400, f'Failed to decode base64 body: {str(e)}')
         else:
-            body = body.encode('utf-8')
+            if isinstance(body, str):
+                body = body.encode('utf-8')
         
-        # Parse multipart data (simplified - in production use a proper parser)
-        form_data = parse_multipart_form_data(body, content_type)
+        print(f"Body length: {len(body)} bytes")
+        
+        # Parse multipart data
+        try:
+            form_data = parse_multipart_form_data(body, content_type)
+            print(f"Form data keys: {list(form_data.keys())}")
+        except Exception as e:
+            return error_response(400, f'Failed to parse form data: {str(e)}')
         
         if 'file' not in form_data:
-            return error_response(400, 'No file provided')
+            return error_response(400, f'No file provided. Available fields: {list(form_data.keys())}')
         
         file_data = form_data['file']
         picture_name = form_data.get('picture_name', f'picture_{uuid.uuid4().hex}')
         picture_date = form_data.get('picture_date', datetime.now().strftime('%Y-%m-%d'))
         
+        print(f"File data length: {len(file_data)} bytes")
+        print(f"Picture name: {picture_name}")
+        print(f"Picture date: {picture_date}")
+        
         # Process and validate the image
         try:
             image = Image.open(BytesIO(file_data))
+            print(f"Image format: {image.format}, size: {image.size}, mode: {image.mode}")
             
             # Convert to RGB if necessary
             if image.mode in ('RGBA', 'P'):
@@ -186,11 +203,13 @@ def upload_picture(event):
             max_size = (1920, 1080)
             if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
                 image.thumbnail(max_size, Image.Resampling.LANCZOS)
+                print(f"Resized image to: {image.size}")
             
             # Save as JPEG
             output = BytesIO()
             image.save(output, format='JPEG', quality=85, optimize=True)
             processed_image_data = output.getvalue()
+            print(f"Processed image size: {len(processed_image_data)} bytes")
             
         except Exception as e:
             return error_response(400, f'Invalid image file: {str(e)}')
@@ -199,7 +218,7 @@ def upload_picture(event):
         file_extension = '.jpg'
         unique_filename = f"{uuid.uuid4().hex}{file_extension}"
         
-        # Upload to S3
+        # Upload to S3 (or save locally for demo)
         try:
             s3_client.put_object(
                 Bucket=PICTURES_BUCKET,
@@ -213,6 +232,8 @@ def upload_picture(event):
                 }
             )
             
+            print(f"Successfully uploaded: {unique_filename}")
+            
             # In a real implementation, you would also insert into the Iceberg table here
             # insert_into_iceberg_table(unique_filename, picture_name, picture_date)
             
@@ -224,10 +245,13 @@ def upload_picture(event):
             })
             
         except Exception as e:
+            print(f"S3 upload error: {str(e)}")
             return error_response(500, f'Error uploading to S3: {str(e)}')
         
     except Exception as e:
         print(f"Error uploading picture: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return error_response(500, f'Error uploading picture: {str(e)}')
 
 def get_picture_by_id(event):
@@ -272,53 +296,75 @@ def parse_multipart_form_data(body, content_type):
     Simple multipart form data parser
     In production, use a proper library like python-multipart
     """
-    # Extract boundary
-    boundary = None
-    for part in content_type.split(';'):
-        if 'boundary=' in part:
-            boundary = part.split('boundary=')[1].strip()
-            break
-    
-    if not boundary:
-        raise ValueError('No boundary found in Content-Type')
-    
-    # Split by boundary
-    parts = body.split(f'--{boundary}'.encode())
-    form_data = {}
-    
-    for part in parts[1:-1]:  # Skip first empty part and last closing part
-        if not part.strip():
-            continue
-        
-        # Split headers and content
-        header_end = part.find(b'\r\n\r\n')
-        if header_end == -1:
-            continue
-        
-        headers = part[:header_end].decode('utf-8')
-        content = part[header_end + 4:]
-        
-        # Remove trailing CRLF
-        if content.endswith(b'\r\n'):
-            content = content[:-2]
-        
-        # Parse Content-Disposition header
-        name = None
-        for line in headers.split('\r\n'):
-            if line.startswith('Content-Disposition:'):
-                for param in line.split(';'):
-                    if 'name=' in param:
-                        name = param.split('name=')[1].strip().strip('"')
-                        break
+    try:
+        # Extract boundary
+        boundary = None
+        for part in content_type.split(';'):
+            if 'boundary=' in part:
+                boundary = part.split('boundary=')[1].strip()
                 break
         
-        if name:
-            if name == 'file':
-                form_data[name] = content
+        if not boundary:
+            raise ValueError('No boundary found in Content-Type')
+        
+        # Convert body to bytes if it's a string
+        if isinstance(body, str):
+            body = body.encode('utf-8')
+        
+        # Split by boundary
+        boundary_bytes = f'--{boundary}'.encode()
+        parts = body.split(boundary_bytes)
+        form_data = {}
+        
+        for part in parts[1:-1]:  # Skip first empty part and last closing part
+            if not part.strip():
+                continue
+            
+            # Split headers and content
+            header_end = part.find(b'\r\n\r\n')
+            if header_end == -1:
+                # Try with just \n\n
+                header_end = part.find(b'\n\n')
+                if header_end == -1:
+                    continue
+                headers = part[:header_end].decode('utf-8', errors='ignore')
+                content = part[header_end + 2:]
             else:
-                form_data[name] = content.decode('utf-8')
-    
-    return form_data
+                headers = part[:header_end].decode('utf-8', errors='ignore')
+                content = part[header_end + 4:]
+            
+            # Remove trailing CRLF or LF
+            if content.endswith(b'\r\n'):
+                content = content[:-2]
+            elif content.endswith(b'\n'):
+                content = content[:-1]
+            
+            # Parse Content-Disposition header
+            name = None
+            for line in headers.split('\n'):
+                line = line.strip()
+                if line.startswith('Content-Disposition:'):
+                    for param in line.split(';'):
+                        param = param.strip()
+                        if 'name=' in param:
+                            name = param.split('name=')[1].strip().strip('"').strip("'")
+                            break
+                    break
+            
+            if name:
+                if name == 'file':
+                    form_data[name] = content
+                else:
+                    try:
+                        form_data[name] = content.decode('utf-8')
+                    except UnicodeDecodeError:
+                        form_data[name] = content.decode('utf-8', errors='ignore')
+        
+        return form_data
+        
+    except Exception as e:
+        print(f"Error parsing multipart data: {str(e)}")
+        raise ValueError(f"Failed to parse multipart form data: {str(e)}")
 
 def insert_into_iceberg_table(filename, picture_name, picture_date):
     """
