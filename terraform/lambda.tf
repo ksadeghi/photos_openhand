@@ -92,9 +92,8 @@ resource "aws_lambda_function_url" "frontend" {
   cors {
     allow_credentials = false
     allow_origins     = ["*"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
-    allow_headers     = ["content-type", "authorization"]
-    expose_headers    = ["date"]
+    allow_methods     = ["*"]
+    allow_headers     = ["*"]
     max_age          = 86400
   }
 }
@@ -107,9 +106,8 @@ resource "aws_lambda_function_url" "backend" {
   cors {
     allow_credentials = false
     allow_origins     = ["*"]
-    allow_methods     = ["GET", "POST", "OPTIONS"]
-    allow_headers     = ["content-type", "authorization"]
-    expose_headers    = ["date"]
+    allow_methods     = ["*"]
+    allow_headers     = ["*"]
     max_age          = 86400
   }
 }
