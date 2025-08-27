@@ -117,24 +117,30 @@ resource "aws_lambda_function_url" "backend" {
 }
 
 # Update frontend Lambda environment variable with backend URL
-resource "null_resource" "update_frontend_env" {
+resource "aws_lambda_function" "frontend_updated" {
   depends_on = [aws_lambda_function_url.backend]
 
-  provisioner "local-exec" {
-    command = <<-EOT
-      aws lambda update-function-configuration \
-        --function-name ${aws_lambda_function.frontend.function_name} \
-        --environment Variables='{
-          "ENVIRONMENT":"${local.environment}",
-          "BACKEND_URL":"${aws_lambda_function_url.backend.function_url}"
-        }' \
-        --region ${data.aws_region.current.name}
-    EOT
+  filename         = data.archive_file.frontend_lambda.output_path
+  function_name    = aws_lambda_function.frontend.function_name
+  role            = aws_iam_role.lambda_role.arn
+  handler         = "frontend_lambda.lambda_handler"
+  source_code_hash = data.archive_file.frontend_lambda.output_base64sha256
+  runtime         = "python3.12"
+  timeout         = var.lambda_timeout
+  memory_size     = var.lambda_memory_size
+
+  layers = [aws_lambda_layer_version.dependencies.arn]
+
+  environment {
+    variables = {
+      ENVIRONMENT = local.environment
+      BACKEND_URL = aws_lambda_function_url.backend.function_url
+    }
   }
 
-  triggers = {
-    backend_url = aws_lambda_function_url.backend.function_url
-  }
+  tags = merge(local.common_tags, {
+    Name = "Frontend Lambda"
+  })
 }
 
 # CloudWatch Log Groups
