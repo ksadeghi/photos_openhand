@@ -1,0 +1,33 @@
+
+
+
+
+
+
+
+
+
+# AWS Configuration
+aws_region = "us-east-1"
+environment = "dev"
+
+# S3 Configuration
+pictures_bucket_name = ""  # Leave empty for auto-generated name, or specify a globally unique name
+
+# Lambda Configuration
+lambda_timeout = 30
+lambda_memory_size = 512
+
+# CORS Configuration
+enable_cors = true
+
+# Iceberg Configuration
+iceberg_warehouse_path = "warehouse"
+
+
+
+
+
+
+
+
