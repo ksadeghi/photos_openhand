@@ -74,7 +74,6 @@ resource "aws_lambda_function" "backend" {
       ENVIRONMENT           = local.environment
       PICTURES_BUCKET      = aws_s3_bucket.pictures.bucket
       ICEBERG_WAREHOUSE_PATH = var.iceberg_warehouse_path
-      AWS_REGION           = data.aws_region.current.name
     }
   }
 
