@@ -1,5 +1,6 @@
 import json
 import base64
+import os
 
 def lambda_handler(event, context):
     """
@@ -279,9 +280,12 @@ def serve_css():
 
 def serve_js():
     """Serve the JavaScript code"""
-    js_content = """
-    // Configuration - Replace with your actual backend Lambda function URL
-    const API_BASE_URL = 'https://your-backend-lambda-url.lambda-url.region.on.aws';
+    # Get backend URL from environment variable
+    backend_url = os.environ.get('BACKEND_URL', 'https://your-backend-lambda-url.lambda-url.region.on.aws')
+    
+    js_content = f"""
+    // Configuration - Backend Lambda function URL from environment
+    const API_BASE_URL = '{backend_url}';
     
     // Load pictures when page loads
     document.addEventListener('DOMContentLoaded', function() {

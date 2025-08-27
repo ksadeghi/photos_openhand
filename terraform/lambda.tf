@@ -45,7 +45,7 @@ resource "aws_lambda_function" "frontend" {
   environment {
     variables = {
       ENVIRONMENT = local.environment
-      BACKEND_URL = aws_lambda_function_url.backend.function_url
+      BACKEND_URL = "placeholder"  # Will be updated after deployment
     }
   }
 
@@ -54,6 +54,10 @@ resource "aws_lambda_function" "frontend" {
   })
 
   depends_on = [aws_lambda_layer_version.dependencies]
+
+  lifecycle {
+    ignore_changes = [environment]
+  }
 }
 
 # Backend Lambda function
@@ -109,6 +113,27 @@ resource "aws_lambda_function_url" "backend" {
     allow_methods     = ["*"]
     allow_headers     = ["*"]
     max_age          = 86400
+  }
+}
+
+# Update frontend Lambda environment variable with backend URL
+resource "null_resource" "update_frontend_env" {
+  depends_on = [aws_lambda_function_url.backend]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws lambda update-function-configuration \
+        --function-name ${aws_lambda_function.frontend.function_name} \
+        --environment Variables='{
+          "ENVIRONMENT":"${local.environment}",
+          "BACKEND_URL":"${aws_lambda_function_url.backend.function_url}"
+        }' \
+        --region ${data.aws_region.current.name}
+    EOT
+  }
+
+  triggers = {
+    backend_url = aws_lambda_function_url.backend.function_url
   }
 }
 
