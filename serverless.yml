@@ -1,0 +1,123 @@
+
+service: picture-gallery-app
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  
+  environment:
+    PICTURES_BUCKET: ${self:custom.picturesBucket}
+    ICEBERG_BUCKET: ${self:custom.icebergBucket}
+    ICEBERG_TABLE_PATH: pictures_table
+  
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:DeleteObject
+        - s3:ListBucket
+        - s3:HeadObject
+      Resource:
+        - arn:aws:s3:::${self:custom.picturesBucket}
+        - arn:aws:s3:::${self:custom.picturesBucket}/*
+        - arn:aws:s3:::${self:custom.icebergBucket}
+        - arn:aws:s3:::${self:custom.icebergBucket}/*
+
+custom:
+  picturesBucket: ${self:service}-pictures-${self:provider.stage}
+  icebergBucket: ${self:service}-iceberg-${self:provider.stage}
+
+functions:
+  frontend:
+    handler: frontend_lambda.lambda_handler
+    timeout: 30
+    memorySize: 256
+    url:
+      cors: true
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+      - httpApi:
+          path: /
+          method: GET
+
+  backend:
+    handler: backend_lambda.lambda_handler
+    timeout: 30
+    memorySize: 512
+    url:
+      cors: true
+    events:
+      - httpApi:
+          path: /pictures
+          method: GET
+      - httpApi:
+          path: /upload
+          method: POST
+      - httpApi:
+          path: /picture/{id}
+          method: GET
+
+resources:
+  Resources:
+    PicturesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.picturesBucket}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - PUT
+                - POST
+                - DELETE
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+
+    IcebergBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.icebergBucket}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+
+  Outputs:
+    FrontendUrl:
+      Description: "Frontend Lambda Function URL"
+      Value:
+        Fn::GetAtt:
+          - FrontendLambdaFunctionUrl
+          - FunctionUrl
+      Export:
+        Name: ${self:service}-${self:provider.stage}-frontend-url
+
+    BackendUrl:
+      Description: "Backend Lambda Function URL"
+      Value:
+        Fn::GetAtt:
+          - BackendLambdaFunctionUrl
+          - FunctionUrl
+      Export:
+        Name: ${self:service}-${self:provider.stage}-backend-url
+
+plugins:
+  - serverless-python-requirements
+

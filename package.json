@@ -1,0 +1,26 @@
+
+{
+  "name": "picture-gallery-lambda",
+  "version": "1.0.0",
+  "description": "Serverless Picture Gallery Application with Lambda Functions",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "./deploy.sh",
+    "test": "python local_test.py",
+    "setup-iceberg": "python iceberg_setup.py"
+  },
+  "keywords": [
+    "aws",
+    "lambda",
+    "serverless",
+    "s3",
+    "iceberg",
+    "picture-gallery"
+  ],
+  "author": "OpenHands",
+  "license": "MIT",
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-python-requirements": "^6.0.0"
+  }
+}
