@@ -1302,9 +1302,9 @@ def rate_picture(event):
                 'body': json.dumps({'error': 'Rating must be an integer between 1 and 5'})
             }
         
-        print(f"Rating picture {picture_name} with {rating} stars")
+        print(f"Rating picture '{picture_name}' with {rating} stars")
         
-        # Find the S3 object for this picture
+        # Find the S3 object for this picture using metadata
         response = s3_client.list_objects_v2(
             Bucket=PICTURES_BUCKET,
             Prefix='pictures/'
@@ -1312,13 +1312,35 @@ def rate_picture(event):
         
         s3_key = None
         if 'Contents' in response:
+            print(f"Found {len(response['Contents'])} objects in S3 for rating")
             for obj in response['Contents']:
                 key = obj['Key']
-                filename = key.split('/')[-1]
-                # Match by picture name (flexible matching)
-                if picture_name.lower() in filename.lower():
-                    s3_key = key
-                    break
+                try:
+                    # Get object metadata to find original name
+                    head_response = s3_client.head_object(
+                        Bucket=PICTURES_BUCKET,
+                        Key=key
+                    )
+                    metadata = head_response.get('Metadata', {})
+                    original_name = metadata.get('original-name', key.split('/')[-1])
+                    print(f"Checking S3 object: {key} -> original_name: '{original_name}'")
+                    
+                    # Match by original name from metadata
+                    if (original_name == picture_name or 
+                        picture_name.lower() in original_name.lower() or
+                        original_name.lower() in picture_name.lower()):
+                        s3_key = key
+                        print(f"Found match for rating: '{picture_name}' -> {key}")
+                        break
+                        
+                except Exception as meta_error:
+                    print(f"Error getting metadata for {key}: {meta_error}")
+                    # Fallback to filename matching
+                    filename = key.split('/')[-1]
+                    if picture_name.lower() in filename.lower():
+                        s3_key = key
+                        print(f"Found fallback match for rating: '{picture_name}' -> {key}")
+                        break
         
         if not s3_key:
             return {
