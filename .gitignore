@@ -79,3 +79,13 @@ yarn-error.log*
 # Environment variables
 .env
 
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+terraform/.terraform/
+terraform/terraform.tfstate*
+terraform/*.zip
+lambda-layer.zip

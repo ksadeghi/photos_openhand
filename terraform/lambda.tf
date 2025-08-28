@@ -1,8 +1,5 @@
 
 
-
-
-
 # Lambda Layer for dependencies
 resource "aws_lambda_layer_version" "dependencies" {
   filename   = "${path.module}/../lambda-layer.zip"
@@ -15,58 +12,20 @@ resource "aws_lambda_layer_version" "dependencies" {
   description = "Python dependencies for Photos OpenHand application"
 }
 
-# Archive frontend Lambda code
-data "archive_file" "frontend_lambda" {
+# Archive unified Lambda code
+data "archive_file" "unified_lambda" {
   type        = "zip"
-  source_file = "${path.module}/../frontend_lambda.py"
-  output_path = "${path.module}/frontend_lambda.zip"
+  source_file = "${path.module}/../unified_lambda.py"
+  output_path = "${path.module}/unified_lambda.zip"
 }
 
-# Archive backend Lambda code
-data "archive_file" "backend_lambda" {
-  type        = "zip"
-  source_file = "${path.module}/../backend_lambda.py"
-  output_path = "${path.module}/backend_lambda.zip"
-}
-
-# Frontend Lambda function
-resource "aws_lambda_function" "frontend" {
-  filename         = data.archive_file.frontend_lambda.output_path
-  function_name    = "${local.project_name}-frontend-${local.environment}"
+# Unified Lambda function (frontend + backend)
+resource "aws_lambda_function" "unified" {
+  filename         = data.archive_file.unified_lambda.output_path
+  function_name    = "${local.project_name}-unified-${local.environment}"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "frontend_lambda.lambda_handler"
-  source_code_hash = data.archive_file.frontend_lambda.output_base64sha256
-  runtime         = "python3.12"
-  timeout         = var.lambda_timeout
-  memory_size     = var.lambda_memory_size
-
-  layers = [aws_lambda_layer_version.dependencies.arn]
-
-  environment {
-    variables = {
-      ENVIRONMENT = local.environment
-      BACKEND_URL = "placeholder"  # Will be updated after deployment
-    }
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "Frontend Lambda"
-  })
-
-  depends_on = [aws_lambda_layer_version.dependencies]
-
-  lifecycle {
-    ignore_changes = [environment]
-  }
-}
-
-# Backend Lambda function
-resource "aws_lambda_function" "backend" {
-  filename         = data.archive_file.backend_lambda.output_path
-  function_name    = "${local.project_name}-backend-${local.environment}"
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "backend_lambda.lambda_handler"
-  source_code_hash = data.archive_file.backend_lambda.output_base64sha256
+  handler         = "unified_lambda.lambda_handler"
+  source_code_hash = data.archive_file.unified_lambda.output_base64sha256
   runtime         = "python3.12"
   timeout         = var.lambda_timeout
   memory_size     = var.lambda_memory_size
@@ -82,15 +41,15 @@ resource "aws_lambda_function" "backend" {
   }
 
   tags = merge(local.common_tags, {
-    Name = "Backend Lambda"
+    Name = "Unified Lambda (Frontend + Backend)"
   })
 
   depends_on = [aws_lambda_layer_version.dependencies]
 }
 
-# Lambda function URL for frontend
-resource "aws_lambda_function_url" "frontend" {
-  function_name      = aws_lambda_function.frontend.function_name
+# Lambda function URL for unified function
+resource "aws_lambda_function_url" "unified" {
+  function_name      = aws_lambda_function.unified.function_name
   authorization_type = "NONE"
 
   cors {
@@ -102,60 +61,10 @@ resource "aws_lambda_function_url" "frontend" {
   }
 }
 
-# Lambda function URL for backend
-resource "aws_lambda_function_url" "backend" {
-  function_name      = aws_lambda_function.backend.function_name
-  authorization_type = "NONE"
-
-  cors {
-    allow_credentials = false
-    allow_origins     = ["*"]
-    allow_methods     = ["*"]
-    allow_headers     = ["*"]
-    max_age          = 86400
-  }
-}
-
-# Update frontend Lambda environment variable with backend URL
-resource "aws_lambda_function" "frontend_updated" {
-  depends_on = [aws_lambda_function_url.backend]
-
-  filename         = data.archive_file.frontend_lambda.output_path
-  function_name    = aws_lambda_function.frontend.function_name
-  role            = aws_iam_role.lambda_role.arn
-  handler         = "frontend_lambda.lambda_handler"
-  source_code_hash = data.archive_file.frontend_lambda.output_base64sha256
-  runtime         = "python3.12"
-  timeout         = var.lambda_timeout
-  memory_size     = var.lambda_memory_size
-
-  layers = [aws_lambda_layer_version.dependencies.arn]
-
-  environment {
-    variables = {
-      ENVIRONMENT = local.environment
-      BACKEND_URL = aws_lambda_function_url.backend.function_url
-    }
-  }
-
-  tags = merge(local.common_tags, {
-    Name = "Frontend Lambda"
-  })
-}
-
-# CloudWatch Log Groups
-resource "aws_cloudwatch_log_group" "frontend_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.frontend.function_name}"
+# CloudWatch Log Group
+resource "aws_cloudwatch_log_group" "unified_logs" {
+  name              = "/aws/lambda/${aws_lambda_function.unified.function_name}"
   retention_in_days = 14
   tags              = local.common_tags
 }
-
-resource "aws_cloudwatch_log_group" "backend_logs" {
-  name              = "/aws/lambda/${aws_lambda_function.backend.function_name}"
-  retention_in_days = 14
-  tags              = local.common_tags
-}
-
-
-
 
