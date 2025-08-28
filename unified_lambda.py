@@ -4,8 +4,6 @@ import os
 import boto3
 import uuid
 from datetime import datetime
-from io import BytesIO
-from PIL import Image
 from urllib.parse import parse_qs
 
 # Initialize AWS clients
@@ -535,28 +533,8 @@ def upload_picture(event):
         # Decode base64 image data
         image_bytes = base64.b64decode(picture_data)
         
-        # Process image with Pillow (optional: resize, optimize)
-        try:
-            image = Image.open(BytesIO(image_bytes))
-            
-            # Convert to RGB if necessary
-            if image.mode in ('RGBA', 'P'):
-                image = image.convert('RGB')
-            
-            # Resize if too large (max 1920x1080)
-            max_size = (1920, 1080)
-            if image.size[0] > max_size[0] or image.size[1] > max_size[1]:
-                image.thumbnail(max_size, Image.Resampling.LANCZOS)
-            
-            # Save processed image
-            output_buffer = BytesIO()
-            image.save(output_buffer, format='JPEG', quality=85, optimize=True)
-            processed_image_bytes = output_buffer.getvalue()
-            
-        except Exception as e:
-            print(f"Error processing image: {str(e)}")
-            # Use original image data if processing fails
-            processed_image_bytes = image_bytes
+        # Use original image data (no processing to avoid PIL dependency)
+        processed_image_bytes = image_bytes
         
         # Generate unique filename
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
