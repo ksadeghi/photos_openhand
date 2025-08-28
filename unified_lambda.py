@@ -480,7 +480,7 @@ def get_pictures():
             print(f"Found {len(response['Contents'])} objects")
             for obj in response['Contents']:
                 print(f"Processing object: {obj['Key']}")
-                if obj['Key'].endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
                     # Generate presigned URL for the image
                     url = s3_client.generate_presigned_url(
                         'get_object',
