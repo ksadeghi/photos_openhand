@@ -374,6 +374,16 @@ def serve_js():
             return;
         }
         
+        // Confirmation prompt
+        const fileNames = Array.from(files).map(file => file.name).join(', ');
+        const confirmMessage = files.length === 1 
+            ? `Are you sure you want to upload "${fileNames}"?`
+            : `Are you sure you want to upload ${files.length} pictures?\n\nFiles: ${fileNames}`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
         const uploadButton = document.querySelector('button');
         uploadButton.disabled = true;
         uploadButton.textContent = 'Uploading...';
