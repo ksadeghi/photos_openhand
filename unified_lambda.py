@@ -466,14 +466,20 @@ def serve_js():
 def get_pictures():
     """Get list of pictures from S3"""
     try:
+        print(f"Getting pictures from bucket: {PICTURES_BUCKET}")
+        
         response = s3_client.list_objects_v2(
             Bucket=PICTURES_BUCKET,
             Prefix='pictures/'
         )
         
+        print(f"S3 response keys: {list(response.keys())}")
+        
         pictures = []
         if 'Contents' in response:
+            print(f"Found {len(response['Contents'])} objects")
             for obj in response['Contents']:
+                print(f"Processing object: {obj['Key']}")
                 if obj['Key'].endswith(('.jpg', '.jpeg', '.png', '.gif')):
                     # Generate presigned URL for the image
                     url = s3_client.generate_presigned_url(
@@ -482,14 +488,20 @@ def get_pictures():
                         ExpiresIn=3600  # 1 hour
                     )
                     
-                    pictures.append({
+                    picture_info = {
                         'name': obj['Key'].split('/')[-1],
                         'date': obj['LastModified'].isoformat(),
                         'url': url
-                    })
+                    }
+                    pictures.append(picture_info)
+                    print(f"Added picture: {picture_info['name']}")
+        else:
+            print("No 'Contents' key in S3 response - bucket may be empty or prefix not found")
         
         # Sort by date (newest first)
         pictures.sort(key=lambda x: x['date'], reverse=True)
+        
+        print(f"Returning {len(pictures)} pictures")
         
         return {
             'statusCode': 200,
@@ -502,6 +514,8 @@ def get_pictures():
         
     except Exception as e:
         print(f"Error getting pictures: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return {
             'statusCode': 500,
             'headers': get_cors_headers(),
