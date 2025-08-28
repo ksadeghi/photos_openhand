@@ -41,7 +41,7 @@ resource "aws_lambda_function" "unified" {
   }
 
   tags = merge(local.common_tags, {
-    Name = "Unified Lambda (Frontend + Backend)"
+    Name = "Unified Lambda Frontend Backend"
   })
 
   depends_on = [aws_lambda_layer_version.dependencies]
