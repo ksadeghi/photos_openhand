@@ -12,11 +12,11 @@ resource "aws_lambda_layer_version" "dependencies" {
   description = "Python dependencies for Photos OpenHand application"
 }
 
-# Archive unified Lambda code
+# Archive test Lambda code for debugging
 data "archive_file" "unified_lambda" {
   type        = "zip"
-  source_file = "${path.module}/../unified_lambda.py"
-  output_path = "${path.module}/unified_lambda.zip"
+  source_file = "${path.module}/../test_lambda.py"
+  output_path = "${path.module}/test_lambda.zip"
 }
 
 # Unified Lambda function (frontend + backend)
@@ -24,13 +24,13 @@ resource "aws_lambda_function" "unified" {
   filename         = data.archive_file.unified_lambda.output_path
   function_name    = "${local.project_name}-unified-${local.environment}"
   role            = aws_iam_role.lambda_role.arn
-  handler         = "unified_lambda.lambda_handler"
+  handler         = "test_lambda.lambda_handler"
   source_code_hash = data.archive_file.unified_lambda.output_base64sha256
   runtime         = "python3.12"
   timeout         = var.lambda_timeout
   memory_size     = var.lambda_memory_size
 
-  layers = [aws_lambda_layer_version.dependencies.arn]
+  # layers = [aws_lambda_layer_version.dependencies.arn]  # Disabled for testing
 
   environment {
     variables = {
