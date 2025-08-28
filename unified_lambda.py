@@ -586,9 +586,8 @@ def upload_picture(event):
                 'key': s3_key,
                 'original_name': picture_name
             })
-        }
         
-    } except Exception as e:
+    except Exception as e:
         print(f"Error uploading picture: {str(e)}")
         return {
             'statusCode': 500,
