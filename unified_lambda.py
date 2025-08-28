@@ -42,6 +42,8 @@ def lambda_handler(event, context):
             return get_pictures()
         elif path == '/api/pictures' and method == 'POST':
             return upload_picture(event)
+        elif path == '/api/stats' and method == 'GET':
+            return get_stats()
         else:
             return {
                 'statusCode': 404,
@@ -92,6 +94,7 @@ def serve_html():
         <div class="container">
             <header>
                 <h1>Picture Gallery</h1>
+                <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
                     <button onclick="uploadPictures()">Upload Pictures</button>
@@ -103,6 +106,17 @@ def serve_html():
                 <div id="errorMessage" class="error" style="display: none;"></div>
                 <div id="gallery" class="gallery"></div>
             </main>
+        </div>
+        
+        <!-- Stats Modal -->
+        <div id="statsModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeStats()">&times;</span>
+                <h2>📊 Gallery Statistics</h2>
+                <div id="statsContent">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
         </div>
         
         <script src="/script.js"></script>
@@ -149,6 +163,29 @@ def serve_css():
         border-radius: 15px;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         backdrop-filter: blur(10px);
+        position: relative;
+    }
+
+    .stats-button {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .stats-button:hover {
+        background: #5a67d8;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
 
     h1 {
@@ -272,6 +309,79 @@ def serve_css():
         border-radius: 8px;
         margin: 10px 0;
         text-align: center;
+    }
+
+    /* Modal Styles */
+    .modal {
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        background-color: white;
+        margin: 10% auto;
+        padding: 30px;
+        border-radius: 15px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        position: relative;
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .close {
+        position: absolute;
+        right: 20px;
+        top: 15px;
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: color 0.3s ease;
+    }
+
+    .close:hover {
+        color: #667eea;
+    }
+
+    .stats-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 1px solid #eee;
+        font-size: 16px;
+    }
+
+    .stats-item:last-child {
+        border-bottom: none;
+    }
+
+    .stats-label {
+        font-weight: 500;
+        color: #4a5568;
+    }
+
+    .stats-value {
+        font-weight: 600;
+        color: #667eea;
     }
 
     @media (max-width: 768px) {
@@ -462,6 +572,73 @@ def serve_js():
             reader.readAsDataURL(file);
         });
     }
+    
+    async function showStats() {
+        const modal = document.getElementById('statsModal');
+        const statsContent = document.getElementById('statsContent');
+        
+        // Show modal
+        modal.style.display = 'block';
+        
+        // Show loading
+        statsContent.innerHTML = '<div class="loading">Loading statistics...</div>';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/stats`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const stats = await response.json();
+            
+            // Format storage size
+            const formatBytes = (bytes) => {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            };
+            
+            // Display stats
+            statsContent.innerHTML = `
+                <div class="stats-item">
+                    <span class="stats-label">📸 Total Pictures</span>
+                    <span class="stats-value">${stats.totalPictures}</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">💾 Total Storage</span>
+                    <span class="stats-value">${formatBytes(stats.totalStorage)}</span>
+                </div>
+                <div class="stats-item">
+                    <span class="stats-label">📅 Last Updated</span>
+                    <span class="stats-value">${new Date().toLocaleString()}</span>
+                </div>
+            `;
+            
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            statsContent.innerHTML = `
+                <div class="error">
+                    Failed to load statistics: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    function closeStats() {
+        const modal = document.getElementById('statsModal');
+        modal.style.display = 'none';
+    }
+    
+    // Close modal when clicking outside of it
+    window.onclick = function(event) {
+        const modal = document.getElementById('statsModal');
+        if (event.target === modal) {
+            closeStats();
+        }
+    }
     """
     
     return {
@@ -530,6 +707,47 @@ def get_pictures():
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({'error': f'Failed to get pictures: {str(e)}'})
+        }
+
+def get_stats():
+    """Get gallery statistics from S3"""
+    try:
+        print(f"Getting stats from bucket: {PICTURES_BUCKET}")
+        
+        # List all objects in the pictures folder
+        response = s3_client.list_objects_v2(
+            Bucket=PICTURES_BUCKET,
+            Prefix='pictures/'
+        )
+        
+        total_pictures = 0
+        total_storage = 0
+        
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                    total_pictures += 1
+                    total_storage += obj['Size']
+        
+        print(f"Stats: {total_pictures} pictures, {total_storage} bytes")
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'totalPictures': total_pictures,
+                'totalStorage': total_storage
+            })
+        }
+        
+    except Exception as e:
+        print(f"Error getting stats: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to get stats: {str(e)}'})
         }
 
 def upload_picture(event):
