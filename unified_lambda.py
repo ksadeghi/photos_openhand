@@ -1158,6 +1158,9 @@ def delete_pictures(event):
             }
         
         print(f"Deleting pictures: {picture_names}")
+        print(f"Picture names type: {type(picture_names)}")
+        for i, name in enumerate(picture_names):
+            print(f"Picture {i}: '{name}' (type: {type(name)})")
         
         # First, get all objects to find the actual S3 keys
         response = s3_client.list_objects_v2(
@@ -1165,42 +1168,53 @@ def delete_pictures(event):
             Prefix='pictures/'
         )
         
-        # Create a mapping of picture names to S3 keys
+        # Create a mapping of picture names to S3 keys using metadata
         name_to_key = {}
-        if 'Contents' in response:
-            for obj in response['Contents']:
-                key = obj['Key']
-                # Extract the original filename from the S3 key
-                # Format: pictures/timestamp_uuid.extension
-                filename = key.split('/')[-1]  # Get just the filename part
-                # Try to match by the original name stored in the key or by exact match
-                for picture_name in picture_names:
-                    if picture_name in filename or filename.startswith(picture_name):
-                        name_to_key[picture_name] = key
-                        break
-        
-        # Find keys to delete
         keys_to_delete = []
         not_found = []
         
-        for picture_name in picture_names:
-            if picture_name in name_to_key:
-                keys_to_delete.append({'Key': name_to_key[picture_name]})
-            else:
-                # Try to find by exact match or partial match
-                found = False
-                if 'Contents' in response:
-                    for obj in response['Contents']:
-                        key = obj['Key']
-                        filename = key.split('/')[-1]
-                        # More flexible matching - check if picture name is in the filename
-                        if picture_name.lower() in filename.lower():
+        if 'Contents' in response:
+            print(f"Found {len(response['Contents'])} objects in S3")
+            for obj in response['Contents']:
+                key = obj['Key']
+                try:
+                    # Get object metadata to find original name
+                    head_response = s3_client.head_object(
+                        Bucket=PICTURES_BUCKET,
+                        Key=key
+                    )
+                    metadata = head_response.get('Metadata', {})
+                    original_name = metadata.get('original-name', key.split('/')[-1])
+                    print(f"S3 object: {key} -> original_name: '{original_name}' (metadata: {metadata})")
+                    
+                    # Check if this picture should be deleted
+                    for picture_name in picture_names:
+                        print(f"Comparing '{picture_name}' with '{original_name}'")
+                        if (original_name == picture_name or 
+                            picture_name.lower() in original_name.lower() or
+                            original_name.lower() in picture_name.lower()):
                             keys_to_delete.append({'Key': key})
-                            found = True
+                            name_to_key[picture_name] = key
+                            print(f"Found match: {picture_name} -> {key} (original: {original_name})")
                             break
-                
-                if not found:
-                    not_found.append(picture_name)
+                            
+                except Exception as meta_error:
+                    print(f"Error getting metadata for {key}: {meta_error}")
+                    # Fallback to filename matching
+                    filename = key.split('/')[-1]
+                    for picture_name in picture_names:
+                        if (picture_name.lower() in filename.lower() or
+                            filename.lower().startswith(picture_name.lower())):
+                            keys_to_delete.append({'Key': key})
+                            name_to_key[picture_name] = key
+                            print(f"Found fallback match: {picture_name} -> {key}")
+                            break
+        
+        # Check for pictures that weren't found
+        for picture_name in picture_names:
+            if picture_name not in name_to_key:
+                not_found.append(picture_name)
+                print(f"Picture not found: {picture_name}")
         
         if not keys_to_delete:
             return {
