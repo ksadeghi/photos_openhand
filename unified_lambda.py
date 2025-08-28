@@ -44,6 +44,8 @@ def lambda_handler(event, context):
             return upload_picture(event)
         elif path == '/api/pictures' and method == 'DELETE':
             return delete_pictures(event)
+        elif path == '/api/pictures/rate' and method == 'POST':
+            return rate_picture(event)
         elif path == '/api/stats' and method == 'GET':
             return get_stats()
         else:
@@ -308,6 +310,54 @@ def serve_css():
         border: 3px solid #48bb78;
         border-radius: 15px;
         pointer-events: none;
+    }
+
+    .picture-rating {
+        margin-top: 8px;
+        text-align: center;
+    }
+
+    .stars {
+        display: flex;
+        justify-content: center;
+        gap: 2px;
+        margin-bottom: 4px;
+    }
+
+    .star {
+        font-size: 18px;
+        color: #e2e8f0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+
+    .star:hover {
+        transform: scale(1.1);
+        color: #ffd700;
+    }
+
+    .star.filled {
+        color: #ffd700;
+    }
+
+    /* Star hover effects for rating preview */
+    .stars:hover .star {
+        color: #e2e8f0;
+    }
+
+    .stars .star:hover {
+        color: #ffd700 !important;
+    }
+
+    .stars .star:hover ~ .star {
+        color: #e2e8f0 !important;
+    }
+
+    .rating-text {
+        font-size: 12px;
+        color: #718096;
+        font-weight: 500;
     }
 
     h1 {
@@ -589,6 +639,16 @@ def serve_js():
                 <div class="picture-info">
                     <div class="picture-name">${picture.name}</div>
                     <div class="picture-date">${new Date(picture.date).toLocaleDateString()}</div>
+                    <div class="picture-rating">
+                        <div class="stars" data-picture="${picture.name}">
+                            ${[1,2,3,4,5].map(star => `
+                                <span class="star ${(picture.rating || 0) >= star ? 'filled' : ''}" 
+                                      data-rating="${star}" 
+                                      onclick="ratePicture('${picture.name}', ${star})">★</span>
+                            `).join('')}
+                        </div>
+                        <span class="rating-text">${picture.rating ? `${picture.rating}/5` : 'Not rated'}</span>
+                    </div>
                 </div>
             </div>
         `).join('');
@@ -902,6 +962,50 @@ def serve_js():
             deleteBtn.textContent = '🗑️ Delete Selected';
         }
     }
+    
+    async function ratePicture(pictureName, rating) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/pictures/rate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    picture: pictureName,
+                    rating: rating
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Rating saved:', result);
+            
+            // Update the stars display immediately
+            const starsContainer = document.querySelector(`[data-picture="${pictureName}"]`);
+            if (starsContainer) {
+                const stars = starsContainer.querySelectorAll('.star');
+                const ratingText = starsContainer.parentElement.querySelector('.rating-text');
+                
+                stars.forEach((star, index) => {
+                    if (index < rating) {
+                        star.classList.add('filled');
+                    } else {
+                        star.classList.remove('filled');
+                    }
+                });
+                
+                ratingText.textContent = `${rating}/5`;
+            }
+            
+        } catch (error) {
+            console.error('Error rating picture:', error);
+            alert(`Failed to save rating: ${error.message}`);
+        }
+    }
     """
     
     return {
@@ -938,13 +1042,28 @@ def get_pictures():
                         ExpiresIn=3600  # 1 hour
                     )
                     
+                    # Get object metadata to retrieve rating
+                    try:
+                        head_response = s3_client.head_object(
+                            Bucket=PICTURES_BUCKET,
+                            Key=obj['Key']
+                        )
+                        metadata = head_response.get('Metadata', {})
+                        rating = int(metadata.get('rating', 0)) if metadata.get('rating') else 0
+                        original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                    except Exception as meta_error:
+                        print(f"Error getting metadata for {obj['Key']}: {meta_error}")
+                        rating = 0
+                        original_name = obj['Key'].split('/')[-1]
+                    
                     picture_info = {
-                        'name': obj['Key'].split('/')[-1],
+                        'name': original_name,
                         'date': obj['LastModified'].isoformat(),
-                        'url': url
+                        'url': url,
+                        'rating': rating
                     }
                     pictures.append(picture_info)
-                    print(f"Added picture: {picture_info['name']}")
+                    print(f"Added picture: {picture_info['name']} (rating: {rating})")
         else:
             print("No 'Contents' key in S3 response - bucket may be empty or prefix not found")
         
@@ -1136,6 +1255,108 @@ def delete_pictures(event):
             'body': json.dumps({'error': f'Failed to delete pictures: {str(e)}'})
         }
 
+def rate_picture(event):
+    """Rate a picture by updating S3 object metadata"""
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        if not body:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'No request body provided'})
+            }
+        
+        data = json.loads(body)
+        picture_name = data.get('picture', '')
+        rating = data.get('rating', 0)
+        
+        if not picture_name:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'Picture name is required'})
+            }
+        
+        if not isinstance(rating, int) or rating < 1 or rating > 5:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'Rating must be an integer between 1 and 5'})
+            }
+        
+        print(f"Rating picture {picture_name} with {rating} stars")
+        
+        # Find the S3 object for this picture
+        response = s3_client.list_objects_v2(
+            Bucket=PICTURES_BUCKET,
+            Prefix='pictures/'
+        )
+        
+        s3_key = None
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                key = obj['Key']
+                filename = key.split('/')[-1]
+                # Match by picture name (flexible matching)
+                if picture_name.lower() in filename.lower():
+                    s3_key = key
+                    break
+        
+        if not s3_key:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': f'Picture "{picture_name}" not found'})
+            }
+        
+        # Get current object metadata
+        head_response = s3_client.head_object(
+            Bucket=PICTURES_BUCKET,
+            Key=s3_key
+        )
+        
+        # Update metadata with rating
+        current_metadata = head_response.get('Metadata', {})
+        current_metadata['rating'] = str(rating)
+        current_metadata['original-name'] = picture_name
+        
+        # Copy object with new metadata (S3 doesn't allow direct metadata updates)
+        copy_source = {'Bucket': PICTURES_BUCKET, 'Key': s3_key}
+        s3_client.copy_object(
+            CopySource=copy_source,
+            Bucket=PICTURES_BUCKET,
+            Key=s3_key,
+            Metadata=current_metadata,
+            MetadataDirective='REPLACE',
+            ContentType=head_response.get('ContentType', 'image/jpeg')
+        )
+        
+        print(f"Successfully rated picture {picture_name} with {rating} stars")
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'success': True,
+                'picture': picture_name,
+                'rating': rating
+            })
+        }
+        
+    except Exception as e:
+        print(f"Error rating picture: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to rate picture: {str(e)}'})
+        }
+
 def upload_picture(event):
     """Upload a picture to S3"""
     try:
@@ -1176,8 +1397,9 @@ def upload_picture(event):
             Body=processed_image_bytes,
             ContentType=content_type,
             Metadata={
-                'original_name': picture_name,
-                'upload_date': datetime.now().isoformat()
+                'original-name': picture_name,
+                'upload_date': datetime.now().isoformat(),
+                'rating': '0'
             }
         )
         
