@@ -19,31 +19,47 @@ def lambda_handler(event, context):
     """
     Unified Lambda handler for both frontend and backend
     """
+    try:
+        # Log the incoming event for debugging
+        print(f"Event: {json.dumps(event)}")
+        
+        # Get the path from the event
+        path = event.get('rawPath', '/')
+        method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
+        
+        print(f"Path: {path}, Method: {method}")
+        
+        # Handle CORS preflight requests
+        if method == 'OPTIONS':
+            return cors_response()
+        
+        # Route requests
+        if path == '/' or path == '/index.html':
+            return serve_html()
+        elif path == '/style.css':
+            return serve_css()
+        elif path == '/script.js':
+            return serve_js()
+        elif path == '/api/pictures' and method == 'GET':
+            return get_pictures()
+        elif path == '/api/pictures' and method == 'POST':
+            return upload_picture(event)
+        else:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'Not found'})
+            }
     
-    # Get the path from the event
-    path = event.get('rawPath', '/')
-    method = event.get('requestContext', {}).get('http', {}).get('method', 'GET')
-    
-    # Handle CORS preflight requests
-    if method == 'OPTIONS':
-        return cors_response()
-    
-    # Route requests
-    if path == '/' or path == '/index.html':
-        return serve_html()
-    elif path == '/style.css':
-        return serve_css()
-    elif path == '/script.js':
-        return serve_js()
-    elif path == '/api/pictures' and method == 'GET':
-        return get_pictures()
-    elif path == '/api/pictures' and method == 'POST':
-        return upload_picture(event)
-    else:
+    except Exception as e:
+        print(f"Lambda handler error: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        
         return {
-            'statusCode': 404,
+            'statusCode': 500,
             'headers': get_cors_headers(),
-            'body': json.dumps({'error': 'Not found'})
+            'body': json.dumps({'error': f'Internal server error: {str(e)}'})
         }
 
 def get_cors_headers():
@@ -451,7 +467,7 @@ def serve_js():
 
 def get_pictures():
     """Get list of pictures from S3"""
-    try {
+    try:
         response = s3_client.list_objects_v2(
             Bucket=PICTURES_BUCKET,
             Prefix='pictures/'
@@ -486,7 +502,7 @@ def get_pictures():
             })
         }
         
-    } except Exception as e:
+    except Exception as e:
         print(f"Error getting pictures: {str(e)}")
         return {
             'statusCode': 500,
