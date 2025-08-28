@@ -42,6 +42,8 @@ def lambda_handler(event, context):
             return get_pictures()
         elif path == '/api/pictures' and method == 'POST':
             return upload_picture(event)
+        elif path == '/api/pictures' and method == 'DELETE':
+            return delete_pictures(event)
         elif path == '/api/stats' and method == 'GET':
             return get_stats()
         else:
@@ -95,9 +97,17 @@ def serve_html():
             <header>
                 <h1>Picture Gallery</h1>
                 <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
+                <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
                     <button onclick="uploadPictures()">Upload Pictures</button>
+                </div>
+                
+                <div id="deleteSection" class="delete-section" style="display: none;">
+                    <button id="selectAllBtn" onclick="toggleSelectAll()">Select All</button>
+                    <button id="deleteSelectedBtn" onclick="deleteSelected()" class="delete-btn">🗑️ Delete Selected</button>
+                    <button onclick="cancelSelection()" class="cancel-btn">Cancel</button>
+                    <span id="selectedCount" class="selected-count">0 selected</span>
                 </div>
             </header>
             
@@ -186,6 +196,118 @@ def serve_css():
         background: #5a67d8;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .select-mode-button {
+        position: absolute;
+        top: 20px;
+        right: 120px;
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+    }
+
+    .select-mode-button:hover {
+        background: #38a169;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+    }
+
+    .delete-section {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+        padding: 15px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        flex-wrap: wrap;
+    }
+
+    .delete-btn {
+        background: #e53e3e;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .delete-btn:hover {
+        background: #c53030;
+        transform: translateY(-2px);
+    }
+
+    .cancel-btn {
+        background: #718096;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .cancel-btn:hover {
+        background: #4a5568;
+        transform: translateY(-2px);
+    }
+
+    .selected-count {
+        font-weight: 600;
+        color: #4a5568;
+        margin-left: 10px;
+    }
+
+    .picture-item {
+        position: relative;
+    }
+
+    .picture-checkbox {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+        z-index: 10;
+        display: none;
+    }
+
+    .selection-mode .picture-checkbox {
+        display: block;
+    }
+
+    .picture-item.selected {
+        opacity: 0.7;
+        transform: scale(0.95);
+        transition: all 0.3s ease;
+    }
+
+    .picture-item.selected::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(72, 187, 120, 0.3);
+        border: 3px solid #48bb78;
+        border-radius: 15px;
+        pointer-events: none;
     }
 
     h1 {
@@ -461,7 +583,8 @@ def serve_js():
         const gallery = document.getElementById('gallery');
         
         gallery.innerHTML = pictures.map(picture => `
-            <div class="picture-card">
+            <div class="picture-card picture-item" data-picture-name="${picture.name}">
+                <input type="checkbox" class="picture-checkbox" onchange="updateSelection()">
                 <img src="${picture.url}" alt="${picture.name}" onclick="openFullSize('${picture.url}')">
                 <div class="picture-info">
                     <div class="picture-name">${picture.name}</div>
@@ -639,6 +762,146 @@ def serve_js():
             closeStats();
         }
     }
+    
+    // Delete functionality
+    function enterSelectMode() {
+        const gallery = document.getElementById('gallery');
+        const deleteSection = document.getElementById('deleteSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        
+        gallery.classList.add('selection-mode');
+        deleteSection.style.display = 'flex';
+        uploadSection.style.display = 'none';
+        selectModeBtn.style.display = 'none';
+        
+        updateSelection();
+    }
+    
+    function cancelSelection() {
+        const gallery = document.getElementById('gallery');
+        const deleteSection = document.getElementById('deleteSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        
+        gallery.classList.remove('selection-mode');
+        deleteSection.style.display = 'none';
+        uploadSection.style.display = 'flex';
+        selectModeBtn.style.display = 'block';
+        
+        // Uncheck all checkboxes and remove selected class
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.picture-item').classList.remove('selected');
+        });
+    }
+    
+    function toggleSelectAll() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = !allChecked;
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        updateSelection();
+    }
+    
+    function updateSelection() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectedCount = document.getElementById('selectedCount');
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        
+        let checkedCount = 0;
+        checkboxes.forEach(checkbox => {
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                checkedCount++;
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectedCount.textContent = `${checkedCount} selected`;
+        deleteBtn.disabled = checkedCount === 0;
+        
+        const allChecked = checkedCount === checkboxes.length && checkboxes.length > 0;
+        selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
+    }
+    
+    async function deleteSelected() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox:checked');
+        const pictureNames = Array.from(checkboxes).map(cb => 
+            cb.closest('.picture-item').dataset.pictureName
+        );
+        
+        if (pictureNames.length === 0) {
+            alert('Please select at least one picture to delete.');
+            return;
+        }
+        
+        const confirmMessage = pictureNames.length === 1 
+            ? `Are you sure you want to delete "${pictureNames[0]}"?`
+            : `Are you sure you want to delete ${pictureNames.length} pictures?\\n\\nThis action cannot be undone.`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        const deleteBtn = document.getElementById('deleteSelectedBtn');
+        deleteBtn.disabled = true;
+        deleteBtn.textContent = 'Deleting...';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/pictures`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    pictures: pictureNames
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Delete successful:', result);
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = `Successfully deleted ${pictureNames.length} picture(s)!`;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('main'));
+            
+            setTimeout(() => successDiv.remove(), 3000);
+            
+            // Reload pictures and exit selection mode
+            cancelSelection();
+            loadPictures();
+            
+        } catch (error) {
+            console.error('Error deleting pictures:', error);
+            alert(`Failed to delete pictures: ${error.message}`);
+        } finally {
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = '🗑️ Delete Selected';
+        }
+    }
     """
     
     return {
@@ -748,6 +1011,129 @@ def get_stats():
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({'error': f'Failed to get stats: {str(e)}'})
+        }
+
+def delete_pictures(event):
+    """Delete multiple pictures from S3"""
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        if not body:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'No request body provided'})
+            }
+        
+        data = json.loads(body)
+        picture_names = data.get('pictures', [])
+        
+        if not picture_names:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'No pictures specified for deletion'})
+            }
+        
+        print(f"Deleting pictures: {picture_names}")
+        
+        # First, get all objects to find the actual S3 keys
+        response = s3_client.list_objects_v2(
+            Bucket=PICTURES_BUCKET,
+            Prefix='pictures/'
+        )
+        
+        # Create a mapping of picture names to S3 keys
+        name_to_key = {}
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                key = obj['Key']
+                # Extract the original filename from the S3 key
+                # Format: pictures/timestamp_uuid.extension
+                filename = key.split('/')[-1]  # Get just the filename part
+                # Try to match by the original name stored in the key or by exact match
+                for picture_name in picture_names:
+                    if picture_name in filename or filename.startswith(picture_name):
+                        name_to_key[picture_name] = key
+                        break
+        
+        # Find keys to delete
+        keys_to_delete = []
+        not_found = []
+        
+        for picture_name in picture_names:
+            if picture_name in name_to_key:
+                keys_to_delete.append({'Key': name_to_key[picture_name]})
+            else:
+                # Try to find by exact match or partial match
+                found = False
+                if 'Contents' in response:
+                    for obj in response['Contents']:
+                        key = obj['Key']
+                        filename = key.split('/')[-1]
+                        # More flexible matching - check if picture name is in the filename
+                        if picture_name.lower() in filename.lower():
+                            keys_to_delete.append({'Key': key})
+                            found = True
+                            break
+                
+                if not found:
+                    not_found.append(picture_name)
+        
+        if not keys_to_delete:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({
+                    'error': 'No matching pictures found for deletion',
+                    'not_found': not_found
+                })
+            }
+        
+        # Delete the objects from S3
+        delete_response = s3_client.delete_objects(
+            Bucket=PICTURES_BUCKET,
+            Delete={
+                'Objects': keys_to_delete,
+                'Quiet': False
+            }
+        )
+        
+        deleted_count = len(delete_response.get('Deleted', []))
+        errors = delete_response.get('Errors', [])
+        
+        print(f"Successfully deleted {deleted_count} pictures")
+        if errors:
+            print(f"Errors during deletion: {errors}")
+        
+        result = {
+            'deleted_count': deleted_count,
+            'requested_count': len(picture_names)
+        }
+        
+        if not_found:
+            result['not_found'] = not_found
+        
+        if errors:
+            result['errors'] = errors
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps(result)
+        }
+        
+    except Exception as e:
+        print(f"Error deleting pictures: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to delete pictures: {str(e)}'})
         }
 
 def upload_picture(event):
