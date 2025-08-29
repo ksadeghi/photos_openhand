@@ -104,10 +104,10 @@ def serve_html():
                 <h1>Picture Gallery</h1>
                 <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
                 <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
-                <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()">📥 Download</button>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
-                    <button onclick="uploadPictures()">Upload Pictures</button>
+                    <button id="uploadBtn" onclick="uploadPictures()">Upload Pictures</button>
+                    <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()" style="display: none;">📥 Download</button>
                 </div>
                 
                 <div id="deleteSection" class="delete-section" style="display: none;">
@@ -215,7 +215,7 @@ def serve_css():
     .select-mode-button {
         position: absolute;
         top: 20px;
-        right: 220px;
+        right: 120px;
         background: #48bb78;
         color: white;
         border: none;
@@ -235,9 +235,6 @@ def serve_css():
     }
 
     .download-mode-button {
-        position: absolute;
-        top: 20px;
-        right: 120px;
         background: #3182ce;
         color: white;
         border: none;
@@ -884,7 +881,7 @@ def serve_js():
             return;
         }
         
-        const uploadButton = document.querySelector('.upload-section button');
+        const uploadButton = document.getElementById('uploadBtn');
         uploadButton.disabled = true;
         uploadButton.textContent = 'Uploading...';
         
@@ -1036,11 +1033,19 @@ def serve_js():
         const deleteSection = document.getElementById('deleteSection');
         const uploadSection = document.querySelector('.upload-section');
         const selectModeBtn = document.getElementById('selectModeBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
         
         gallery.classList.add('selection-mode');
         deleteSection.style.display = 'flex';
-        uploadSection.style.display = 'none';
+        uploadSection.style.display = 'flex';
         selectModeBtn.style.display = 'none';
+        
+        // Hide upload elements and show download button
+        uploadBtn.style.display = 'none';
+        fileInput.style.display = 'none';
+        downloadModeBtn.style.display = 'inline-block';
         
         updateSelection();
     }
@@ -1050,12 +1055,20 @@ def serve_js():
         const deleteSection = document.getElementById('deleteSection');
         const uploadSection = document.querySelector('.upload-section');
         const selectModeBtn = document.getElementById('selectModeBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
         const checkboxes = document.querySelectorAll('.picture-checkbox');
         
         gallery.classList.remove('selection-mode');
         deleteSection.style.display = 'none';
         uploadSection.style.display = 'flex';
         selectModeBtn.style.display = 'block';
+        
+        // Restore upload elements and hide download button
+        uploadBtn.style.display = 'inline-block';
+        fileInput.style.display = 'inline-block';
+        downloadModeBtn.style.display = 'none';
         
         // Uncheck all checkboxes and remove selected class
         checkboxes.forEach(checkbox => {
@@ -1185,13 +1198,15 @@ def serve_js():
     function enterDownloadMode() {
         const gallery = document.getElementById('gallery');
         const downloadSection = document.getElementById('downloadSection');
+        const deleteSection = document.getElementById('deleteSection');
         const uploadSection = document.querySelector('.upload-section');
         const downloadModeBtn = document.getElementById('downloadModeBtn');
         const selectModeBtn = document.getElementById('selectModeBtn');
         
         gallery.classList.add('selection-mode');
         downloadSection.style.display = 'flex';
-        uploadSection.style.display = 'none';
+        deleteSection.style.display = 'none';
+        uploadSection.style.display = 'flex';
         downloadModeBtn.style.display = 'none';
         selectModeBtn.style.display = 'none';
         
@@ -1204,13 +1219,21 @@ def serve_js():
         const uploadSection = document.querySelector('.upload-section');
         const downloadModeBtn = document.getElementById('downloadModeBtn');
         const selectModeBtn = document.getElementById('selectModeBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const fileInput = document.getElementById('fileInput');
+        const deleteSection = document.getElementById('deleteSection');
         const checkboxes = document.querySelectorAll('.picture-checkbox');
         
         gallery.classList.remove('selection-mode');
         downloadSection.style.display = 'none';
+        deleteSection.style.display = 'flex';
         uploadSection.style.display = 'flex';
-        downloadModeBtn.style.display = 'block';
-        selectModeBtn.style.display = 'block';
+        downloadModeBtn.style.display = 'inline-block';
+        selectModeBtn.style.display = 'none';
+        
+        // Show delete section and hide upload elements, keep download button visible
+        uploadBtn.style.display = 'none';
+        fileInput.style.display = 'none';
         
         // Uncheck all checkboxes and remove selected class
         checkboxes.forEach(checkbox => {
