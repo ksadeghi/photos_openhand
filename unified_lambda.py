@@ -835,7 +835,7 @@ def serve_js():
             return;
         }
         
-        const uploadButton = document.querySelector('button');
+        const uploadButton = document.querySelector('.upload-section button');
         uploadButton.disabled = true;
         uploadButton.textContent = 'Uploading...';
         
