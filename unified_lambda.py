@@ -48,6 +48,8 @@ def lambda_handler(event, context):
             return rate_picture(event)
         elif path == '/api/pictures/comment' and method == 'POST':
             return add_comment(event)
+        elif path == '/api/pictures/download' and method == 'POST':
+            return download_pictures(event)
         elif path == '/api/stats' and method == 'GET':
             return get_stats()
         else:
@@ -102,6 +104,7 @@ def serve_html():
                 <h1>Picture Gallery</h1>
                 <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
                 <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
+                <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()">📥 Download</button>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
                     <button onclick="uploadPictures()">Upload Pictures</button>
@@ -112,6 +115,13 @@ def serve_html():
                     <button id="deleteSelectedBtn" onclick="deleteSelected()" class="delete-btn">🗑️ Delete Selected</button>
                     <button onclick="cancelSelection()" class="cancel-btn">Cancel</button>
                     <span id="selectedCount" class="selected-count">0 selected</span>
+                </div>
+                
+                <div id="downloadSection" class="download-section" style="display: none;">
+                    <button id="selectAllDownloadBtn" onclick="toggleSelectAllDownload()">Select All</button>
+                    <button id="downloadSelectedBtn" onclick="downloadSelected()" class="download-btn">📥 Download Selected</button>
+                    <button onclick="cancelDownloadSelection()" class="cancel-btn">Cancel</button>
+                    <span id="selectedDownloadCount" class="selected-count">0 selected</span>
                 </div>
             </header>
             
@@ -205,7 +215,7 @@ def serve_css():
     .select-mode-button {
         position: absolute;
         top: 20px;
-        right: 120px;
+        right: 220px;
         background: #48bb78;
         color: white;
         border: none;
@@ -224,7 +234,29 @@ def serve_css():
         box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
     }
 
-    .delete-section {
+    .download-mode-button {
+        position: absolute;
+        top: 20px;
+        right: 120px;
+        background: #3182ce;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(49, 130, 206, 0.3);
+    }
+
+    .download-mode-button:hover {
+        background: #2c5282;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(49, 130, 206, 0.4);
+    }
+
+    .delete-section, .download-section {
         display: flex;
         gap: 10px;
         justify-content: center;
@@ -246,6 +278,23 @@ def serve_css():
         font-size: 14px;
         font-weight: 500;
         transition: all 0.3s ease;
+    }
+
+    .download-btn {
+        background: #3182ce;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+        background: #2c5282;
+        transform: translateY(-2px);
     }
 
     .delete-btn:hover {
@@ -766,7 +815,7 @@ def serve_js():
         
         gallery.innerHTML = pictures.map(picture => `
             <div class="picture-card picture-item" data-picture-name="${picture.name}">
-                <input type="checkbox" class="picture-checkbox" onchange="updateSelection()">
+                <input type="checkbox" class="picture-checkbox" onchange="handleCheckboxChange()">
                 <img src="${picture.url}" alt="${picture.name}" onclick="openFullSize('${picture.url}')">
                 <div class="picture-info">
                     <div class="picture-name">${picture.name}</div>
@@ -1034,6 +1083,17 @@ def serve_js():
         updateSelection();
     }
     
+    function handleCheckboxChange() {
+        const deleteSection = document.getElementById('deleteSection');
+        const downloadSection = document.getElementById('downloadSection');
+        
+        if (deleteSection.style.display === 'flex') {
+            updateSelection();
+        } else if (downloadSection.style.display === 'flex') {
+            updateDownloadSelection();
+        }
+    }
+    
     function updateSelection() {
         const checkboxes = document.querySelectorAll('.picture-checkbox');
         const selectedCount = document.getElementById('selectedCount');
@@ -1118,6 +1178,156 @@ def serve_js():
         } finally {
             deleteBtn.disabled = false;
             deleteBtn.textContent = '🗑️ Delete Selected';
+        }
+    }
+    
+    // Download functionality
+    function enterDownloadMode() {
+        const gallery = document.getElementById('gallery');
+        const downloadSection = document.getElementById('downloadSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        
+        gallery.classList.add('selection-mode');
+        downloadSection.style.display = 'flex';
+        uploadSection.style.display = 'none';
+        downloadModeBtn.style.display = 'none';
+        selectModeBtn.style.display = 'none';
+        
+        updateDownloadSelection();
+    }
+    
+    function cancelDownloadSelection() {
+        const gallery = document.getElementById('gallery');
+        const downloadSection = document.getElementById('downloadSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        
+        gallery.classList.remove('selection-mode');
+        downloadSection.style.display = 'none';
+        uploadSection.style.display = 'flex';
+        downloadModeBtn.style.display = 'block';
+        selectModeBtn.style.display = 'block';
+        
+        // Uncheck all checkboxes and remove selected class
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.picture-item').classList.remove('selected');
+        });
+    }
+    
+    function toggleSelectAllDownload() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectAllBtn = document.getElementById('selectAllDownloadBtn');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = !allChecked;
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        updateDownloadSelection();
+    }
+    
+    function updateDownloadSelection() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectedCount = document.getElementById('selectedDownloadCount');
+        const downloadBtn = document.getElementById('downloadSelectedBtn');
+        const selectAllBtn = document.getElementById('selectAllDownloadBtn');
+        
+        let checkedCount = 0;
+        checkboxes.forEach(checkbox => {
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                checkedCount++;
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectedCount.textContent = `${checkedCount} selected`;
+        downloadBtn.disabled = checkedCount === 0;
+        
+        const allChecked = checkedCount === checkboxes.length && checkboxes.length > 0;
+        selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
+    }
+    
+    async function downloadSelected() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox:checked');
+        const pictureNames = Array.from(checkboxes).map(cb => 
+            cb.closest('.picture-item').dataset.pictureName
+        );
+        
+        if (pictureNames.length === 0) {
+            alert('Please select at least one picture to download.');
+            return;
+        }
+        
+        const downloadBtn = document.getElementById('downloadSelectedBtn');
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Preparing Download...';
+        
+        try {
+            // Request ZIP file from backend
+            const response = await fetch(`${API_BASE_URL}/api/pictures/download`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    pictures: pictureNames
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            // Get the ZIP file as blob
+            const blob = await response.blob();
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `photos_${new Date().toISOString().split('T')[0]}.zip`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = `Successfully prepared download of ${pictureNames.length} picture(s)!`;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('main'));
+            
+            setTimeout(() => successDiv.remove(), 3000);
+            
+            // Exit download mode
+            cancelDownloadSelection();
+            
+        } catch (error) {
+            console.error('Error downloading pictures:', error);
+            alert(`Failed to download pictures: ${error.message}`);
+        } finally {
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = '📥 Download Selected';
         }
     }
     
@@ -1773,6 +1983,125 @@ def add_comment(event):
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({'error': f'Failed to add comment: {str(e)}'})
+        }
+
+def download_pictures(event):
+    """Create and return a ZIP file containing selected pictures"""
+    import zipfile
+    import io
+    
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        data = json.loads(body)
+        picture_names = data.get('pictures', [])
+        
+        if not picture_names:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'No pictures specified for download'})
+            }
+        
+        print(f"Creating ZIP for {len(picture_names)} pictures: {picture_names}")
+        
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Get list of all objects in S3
+            response = s3_client.list_objects_v2(
+                Bucket=PICTURES_BUCKET,
+                Prefix='pictures/'
+            )
+            
+            if 'Contents' not in response:
+                return {
+                    'statusCode': 404,
+                    'headers': get_cors_headers(),
+                    'body': json.dumps({'error': 'No pictures found'})
+                }
+            
+            found_pictures = 0
+            for picture_name in picture_names:
+                # Find the S3 key for this picture name
+                target_key = None
+                for obj in response['Contents']:
+                    if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                        try:
+                            # Get metadata to check original name
+                            head_response = s3_client.head_object(
+                                Bucket=PICTURES_BUCKET,
+                                Key=obj['Key']
+                            )
+                            metadata = head_response.get('Metadata', {})
+                            original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                            
+                            if original_name == picture_name:
+                                target_key = obj['Key']
+                                break
+                        except Exception as e:
+                            print(f"Error checking metadata for {obj['Key']}: {e}")
+                            continue
+                
+                if target_key:
+                    try:
+                        # Download the picture from S3
+                        print(f"Downloading {target_key} for {picture_name}")
+                        obj_response = s3_client.get_object(
+                            Bucket=PICTURES_BUCKET,
+                            Key=target_key
+                        )
+                        
+                        # Add to ZIP file with original name
+                        zip_file.writestr(picture_name, obj_response['Body'].read())
+                        found_pictures += 1
+                        print(f"Added {picture_name} to ZIP")
+                        
+                    except Exception as e:
+                        print(f"Error downloading {target_key}: {e}")
+                        continue
+                else:
+                    print(f"Picture not found: {picture_name}")
+        
+        if found_pictures == 0:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'None of the requested pictures were found'})
+            }
+        
+        # Get ZIP data
+        zip_buffer.seek(0)
+        zip_data = zip_buffer.getvalue()
+        
+        print(f"Created ZIP file with {found_pictures} pictures, size: {len(zip_data)} bytes")
+        
+        # Return ZIP file as binary response
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': f'attachment; filename="photos_{datetime.now().strftime("%Y%m%d")}.zip"',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            },
+            'body': base64.b64encode(zip_data).decode('utf-8'),
+            'isBase64Encoded': True
+        }
+        
+    except Exception as e:
+        print(f"Error creating download ZIP: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to create download: {str(e)}'})
         }
 
 def upload_picture(event):
