@@ -46,6 +46,8 @@ def lambda_handler(event, context):
             return delete_pictures(event)
         elif path == '/api/pictures/rate' and method == 'POST':
             return rate_picture(event)
+        elif path == '/api/pictures/comment' and method == 'POST':
+            return add_comment(event)
         elif path == '/api/stats' and method == 'GET':
             return get_stats()
         else:
@@ -367,6 +369,136 @@ def serve_css():
         font-weight: 300;
     }
 
+    .comments-section {
+        margin-top: 12px;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 8px;
+    }
+
+    .comments-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .comments-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .toggle-comments {
+        background: #4299e1;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .toggle-comments:hover {
+        background: #3182ce;
+    }
+
+    .comments-container {
+        background: #f7fafc;
+        border-radius: 6px;
+        padding: 8px;
+        margin-top: 8px;
+    }
+
+    .existing-comments {
+        margin-bottom: 12px;
+    }
+
+    .comment {
+        background: white;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 6px;
+        border-left: 3px solid #4299e1;
+    }
+
+    .comment:last-child {
+        margin-bottom: 0;
+    }
+
+    .comment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .comment-author {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 12px;
+    }
+
+    .comment-date {
+        font-size: 10px;
+        color: #718096;
+    }
+
+    .comment-text {
+        font-size: 12px;
+        color: #4a5568;
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+
+    .add-comment-form {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 8px;
+    }
+
+    .comment-name {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+    }
+
+    .comment-input {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        font-size: 12px;
+        resize: vertical;
+        min-height: 60px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+
+    .submit-comment {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .submit-comment:hover {
+        background: #38a169;
+    }
+
+    .submit-comment:disabled {
+        background: #a0aec0;
+        cursor: not-allowed;
+    }
+
     .upload-section {
         display: flex;
         gap: 15px;
@@ -648,6 +780,32 @@ def serve_js():
                             `).join('')}
                         </div>
                         <span class="rating-text">${picture.rating ? `${picture.rating}/5` : 'Not rated'}</span>
+                    </div>
+                    <div class="comments-section">
+                        <div class="comments-header">
+                            <span class="comments-title">💬 Comments</span>
+                            <button class="toggle-comments" onclick="toggleComments('${picture.name}')">
+                                ${(picture.comments && picture.comments.length > 0) ? `Show ${picture.comments.length}` : 'Add Comment'}
+                            </button>
+                        </div>
+                        <div class="comments-container" id="comments-${picture.name.replace(/[^a-zA-Z0-9]/g, '_')}" style="display: none;">
+                            <div class="existing-comments">
+                                ${(picture.comments || []).map(comment => `
+                                    <div class="comment">
+                                        <div class="comment-header">
+                                            <span class="comment-author">${comment.author}</span>
+                                            <span class="comment-date">${new Date(comment.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div class="comment-text">${comment.text}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="add-comment-form">
+                                <input type="text" class="comment-name" placeholder="Your name" maxlength="50">
+                                <textarea class="comment-input" placeholder="Write a comment..." maxlength="500"></textarea>
+                                <button class="submit-comment" onclick="submitComment('${picture.name}')">Post Comment</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1006,6 +1164,103 @@ def serve_js():
             alert(`Failed to save rating: ${error.message}`);
         }
     }
+
+    function toggleComments(pictureName) {
+        const containerId = `comments-${pictureName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const container = document.getElementById(containerId);
+        const button = container.previousElementSibling.querySelector('.toggle-comments');
+        
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            button.textContent = 'Hide Comments';
+        } else {
+            container.style.display = 'none';
+            // Reset button text based on comment count
+            const existingComments = container.querySelectorAll('.comment');
+            button.textContent = existingComments.length > 0 ? `Show ${existingComments.length}` : 'Add Comment';
+        }
+    }
+
+    async function submitComment(pictureName) {
+        const containerId = `comments-${pictureName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const container = document.getElementById(containerId);
+        const nameInput = container.querySelector('.comment-name');
+        const textInput = container.querySelector('.comment-input');
+        const submitBtn = container.querySelector('.submit-comment');
+        
+        const authorName = nameInput.value.trim();
+        const commentText = textInput.value.trim();
+        
+        if (!authorName) {
+            alert('Please enter your name');
+            nameInput.focus();
+            return;
+        }
+        
+        if (!commentText) {
+            alert('Please enter a comment');
+            textInput.focus();
+            return;
+        }
+        
+        // Disable form while submitting
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting...';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/pictures/comment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    picture: pictureName,
+                    author: authorName,
+                    text: commentText
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Comment saved:', result);
+            
+            // Clear the form
+            nameInput.value = '';
+            textInput.value = '';
+            
+            // Add the new comment to the display
+            const existingComments = container.querySelector('.existing-comments');
+            const newComment = document.createElement('div');
+            newComment.className = 'comment';
+            newComment.innerHTML = `
+                <div class="comment-header">
+                    <span class="comment-author">${authorName}</span>
+                    <span class="comment-date">${new Date().toLocaleDateString()}</span>
+                </div>
+                <div class="comment-text">${commentText}</div>
+            `;
+            existingComments.appendChild(newComment);
+            
+            // Update the toggle button text
+            const button = container.previousElementSibling.querySelector('.toggle-comments');
+            const commentCount = existingComments.querySelectorAll('.comment').length;
+            button.textContent = `Show ${commentCount}`;
+            
+            // Show success message
+            alert('Comment posted successfully!');
+            
+        } catch (error) {
+            console.error('Error posting comment:', error);
+            alert(`Failed to post comment: ${error.message}`);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Post Comment';
+        }
+    }
     """
     
     return {
@@ -1051,16 +1306,28 @@ def get_pictures():
                         metadata = head_response.get('Metadata', {})
                         rating = int(metadata.get('rating', 0)) if metadata.get('rating') else 0
                         original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                        
+                        # Parse comments from metadata
+                        comments = []
+                        comments_json = metadata.get('comments', '')
+                        if comments_json:
+                            try:
+                                comments = json.loads(comments_json)
+                            except json.JSONDecodeError as json_error:
+                                print(f"Error parsing comments JSON for {obj['Key']}: {json_error}")
+                                comments = []
                     except Exception as meta_error:
                         print(f"Error getting metadata for {obj['Key']}: {meta_error}")
                         rating = 0
                         original_name = obj['Key'].split('/')[-1]
+                        comments = []
                     
                     picture_info = {
                         'name': original_name,
                         'date': obj['LastModified'].isoformat(),
                         'url': url,
-                        'rating': rating
+                        'rating': rating,
+                        'comments': comments
                     }
                     pictures.append(picture_info)
                     print(f"Added picture: {picture_info['name']} (rating: {rating})")
@@ -1391,6 +1658,121 @@ def rate_picture(event):
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({'error': f'Failed to rate picture: {str(e)}'})
+        }
+
+
+def add_comment(event):
+    """Add a comment to a picture by updating S3 object metadata"""
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        data = json.loads(body)
+        picture_name = data.get('picture')
+        author = data.get('author')
+        comment_text = data.get('text')
+        
+        if not picture_name or not author or not comment_text:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'Missing required fields: picture, author, text'})
+            }
+        
+        print(f"Adding comment to picture: {picture_name}")
+        
+        # Find the S3 object key for this picture
+        response = s3_client.list_objects_v2(
+            Bucket=PICTURES_BUCKET,
+            Prefix='pictures/'
+        )
+        
+        target_key = None
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                    # Get metadata to check original name
+                    try:
+                        head_response = s3_client.head_object(
+                            Bucket=PICTURES_BUCKET,
+                            Key=obj['Key']
+                        )
+                        metadata = head_response.get('Metadata', {})
+                        original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                        
+                        if original_name == picture_name:
+                            target_key = obj['Key']
+                            break
+                    except Exception as e:
+                        print(f"Error checking metadata for {obj['Key']}: {e}")
+                        continue
+        
+        if not target_key:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': f'Picture not found: {picture_name}'})
+            }
+        
+        # Get current metadata
+        head_response = s3_client.head_object(
+            Bucket=PICTURES_BUCKET,
+            Key=target_key
+        )
+        current_metadata = head_response.get('Metadata', {})
+        
+        # Parse existing comments
+        existing_comments = []
+        comments_json = current_metadata.get('comments', '')
+        if comments_json:
+            try:
+                existing_comments = json.loads(comments_json)
+            except json.JSONDecodeError as e:
+                print(f"Error parsing existing comments: {e}")
+                existing_comments = []
+        
+        # Add new comment
+        new_comment = {
+            'author': author,
+            'text': comment_text,
+            'date': datetime.now().isoformat()
+        }
+        existing_comments.append(new_comment)
+        
+        # Update metadata with new comments
+        updated_metadata = current_metadata.copy()
+        updated_metadata['comments'] = json.dumps(existing_comments)
+        
+        # Copy object with updated metadata
+        s3_client.copy_object(
+            Bucket=PICTURES_BUCKET,
+            CopySource={'Bucket': PICTURES_BUCKET, 'Key': target_key},
+            Key=target_key,
+            Metadata=updated_metadata,
+            MetadataDirective='REPLACE'
+        )
+        
+        print(f"Comment added successfully to {picture_name}")
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'message': 'Comment added successfully',
+                'comment': new_comment
+            })
+        }
+        
+    except Exception as e:
+        print(f"Error adding comment: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to add comment: {str(e)}'})
         }
 
 def upload_picture(event):
