@@ -46,6 +46,10 @@ def lambda_handler(event, context):
             return delete_pictures(event)
         elif path == '/api/pictures/rate' and method == 'POST':
             return rate_picture(event)
+        elif path == '/api/pictures/comment' and method == 'POST':
+            return add_comment(event)
+        elif path == '/api/pictures/download' and method == 'POST':
+            return download_pictures(event)
         elif path == '/api/stats' and method == 'GET':
             return get_stats()
         else:
@@ -100,6 +104,7 @@ def serve_html():
                 <h1>Picture Gallery</h1>
                 <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
                 <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
+                <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()">📥 Download</button>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
                     <button onclick="uploadPictures()">Upload Pictures</button>
@@ -110,6 +115,13 @@ def serve_html():
                     <button id="deleteSelectedBtn" onclick="deleteSelected()" class="delete-btn">🗑️ Delete Selected</button>
                     <button onclick="cancelSelection()" class="cancel-btn">Cancel</button>
                     <span id="selectedCount" class="selected-count">0 selected</span>
+                </div>
+                
+                <div id="downloadSection" class="download-section" style="display: none;">
+                    <button id="selectAllDownloadBtn" onclick="toggleSelectAllDownload()">Select All</button>
+                    <button id="downloadSelectedBtn" onclick="downloadSelected()" class="download-btn">📥 Download Selected</button>
+                    <button onclick="cancelDownloadSelection()" class="cancel-btn">Cancel</button>
+                    <span id="selectedDownloadCount" class="selected-count">0 selected</span>
                 </div>
             </header>
             
@@ -203,7 +215,7 @@ def serve_css():
     .select-mode-button {
         position: absolute;
         top: 20px;
-        right: 120px;
+        right: 220px;
         background: #48bb78;
         color: white;
         border: none;
@@ -222,7 +234,29 @@ def serve_css():
         box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
     }
 
-    .delete-section {
+    .download-mode-button {
+        position: absolute;
+        top: 20px;
+        right: 120px;
+        background: #3182ce;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 8px rgba(49, 130, 206, 0.3);
+    }
+
+    .download-mode-button:hover {
+        background: #2c5282;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(49, 130, 206, 0.4);
+    }
+
+    .delete-section, .download-section {
         display: flex;
         gap: 10px;
         justify-content: center;
@@ -244,6 +278,23 @@ def serve_css():
         font-size: 14px;
         font-weight: 500;
         transition: all 0.3s ease;
+    }
+
+    .download-btn {
+        background: #3182ce;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+        background: #2c5282;
+        transform: translateY(-2px);
     }
 
     .delete-btn:hover {
@@ -365,6 +416,136 @@ def serve_css():
         margin-bottom: 20px;
         font-size: 2.5em;
         font-weight: 300;
+    }
+
+    .comments-section {
+        margin-top: 12px;
+        border-top: 1px solid #e2e8f0;
+        padding-top: 8px;
+    }
+
+    .comments-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+    .comments-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #4a5568;
+    }
+
+    .toggle-comments {
+        background: #4299e1;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .toggle-comments:hover {
+        background: #3182ce;
+    }
+
+    .comments-container {
+        background: #f7fafc;
+        border-radius: 6px;
+        padding: 8px;
+        margin-top: 8px;
+    }
+
+    .existing-comments {
+        margin-bottom: 12px;
+    }
+
+    .comment {
+        background: white;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 6px;
+        border-left: 3px solid #4299e1;
+    }
+
+    .comment:last-child {
+        margin-bottom: 0;
+    }
+
+    .comment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+    }
+
+    .comment-author {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 12px;
+    }
+
+    .comment-date {
+        font-size: 10px;
+        color: #718096;
+    }
+
+    .comment-text {
+        font-size: 12px;
+        color: #4a5568;
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+
+    .add-comment-form {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 8px;
+    }
+
+    .comment-name {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        font-size: 12px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+    }
+
+    .comment-input {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #e2e8f0;
+        border-radius: 4px;
+        font-size: 12px;
+        resize: vertical;
+        min-height: 60px;
+        margin-bottom: 6px;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+
+    .submit-comment {
+        background: #48bb78;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .submit-comment:hover {
+        background: #38a169;
+    }
+
+    .submit-comment:disabled {
+        background: #a0aec0;
+        cursor: not-allowed;
     }
 
     .upload-section {
@@ -634,7 +815,7 @@ def serve_js():
         
         gallery.innerHTML = pictures.map(picture => `
             <div class="picture-card picture-item" data-picture-name="${picture.name}">
-                <input type="checkbox" class="picture-checkbox" onchange="updateSelection()">
+                <input type="checkbox" class="picture-checkbox" onchange="handleCheckboxChange()">
                 <img src="${picture.url}" alt="${picture.name}" onclick="openFullSize('${picture.url}')">
                 <div class="picture-info">
                     <div class="picture-name">${picture.name}</div>
@@ -648,6 +829,32 @@ def serve_js():
                             `).join('')}
                         </div>
                         <span class="rating-text">${picture.rating ? `${picture.rating}/5` : 'Not rated'}</span>
+                    </div>
+                    <div class="comments-section">
+                        <div class="comments-header">
+                            <span class="comments-title">💬 Comments</span>
+                            <button class="toggle-comments" onclick="toggleComments('${picture.name}')">
+                                ${(picture.comments && picture.comments.length > 0) ? `Show ${picture.comments.length}` : 'Add Comment'}
+                            </button>
+                        </div>
+                        <div class="comments-container" id="comments-${picture.name.replace(/[^a-zA-Z0-9]/g, '_')}" style="display: none;">
+                            <div class="existing-comments">
+                                ${(picture.comments || []).map(comment => `
+                                    <div class="comment">
+                                        <div class="comment-header">
+                                            <span class="comment-author">${comment.author}</span>
+                                            <span class="comment-date">${new Date(comment.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div class="comment-text">${comment.text}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="add-comment-form">
+                                <input type="text" class="comment-name" placeholder="Your name" maxlength="50">
+                                <textarea class="comment-input" placeholder="Write a comment..." maxlength="500"></textarea>
+                                <button class="submit-comment" onclick="submitComment('${picture.name}')">Post Comment</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -677,7 +884,7 @@ def serve_js():
             return;
         }
         
-        const uploadButton = document.querySelector('button');
+        const uploadButton = document.querySelector('.upload-section button');
         uploadButton.disabled = true;
         uploadButton.textContent = 'Uploading...';
         
@@ -876,6 +1083,17 @@ def serve_js():
         updateSelection();
     }
     
+    function handleCheckboxChange() {
+        const deleteSection = document.getElementById('deleteSection');
+        const downloadSection = document.getElementById('downloadSection');
+        
+        if (deleteSection.style.display === 'flex') {
+            updateSelection();
+        } else if (downloadSection.style.display === 'flex') {
+            updateDownloadSelection();
+        }
+    }
+    
     function updateSelection() {
         const checkboxes = document.querySelectorAll('.picture-checkbox');
         const selectedCount = document.getElementById('selectedCount');
@@ -963,6 +1181,156 @@ def serve_js():
         }
     }
     
+    // Download functionality
+    function enterDownloadMode() {
+        const gallery = document.getElementById('gallery');
+        const downloadSection = document.getElementById('downloadSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        
+        gallery.classList.add('selection-mode');
+        downloadSection.style.display = 'flex';
+        uploadSection.style.display = 'none';
+        downloadModeBtn.style.display = 'none';
+        selectModeBtn.style.display = 'none';
+        
+        updateDownloadSelection();
+    }
+    
+    function cancelDownloadSelection() {
+        const gallery = document.getElementById('gallery');
+        const downloadSection = document.getElementById('downloadSection');
+        const uploadSection = document.querySelector('.upload-section');
+        const downloadModeBtn = document.getElementById('downloadModeBtn');
+        const selectModeBtn = document.getElementById('selectModeBtn');
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        
+        gallery.classList.remove('selection-mode');
+        downloadSection.style.display = 'none';
+        uploadSection.style.display = 'flex';
+        downloadModeBtn.style.display = 'block';
+        selectModeBtn.style.display = 'block';
+        
+        // Uncheck all checkboxes and remove selected class
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = false;
+            checkbox.closest('.picture-item').classList.remove('selected');
+        });
+    }
+    
+    function toggleSelectAllDownload() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectAllBtn = document.getElementById('selectAllDownloadBtn');
+        const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = !allChecked;
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+        updateDownloadSelection();
+    }
+    
+    function updateDownloadSelection() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox');
+        const selectedCount = document.getElementById('selectedDownloadCount');
+        const downloadBtn = document.getElementById('downloadSelectedBtn');
+        const selectAllBtn = document.getElementById('selectAllDownloadBtn');
+        
+        let checkedCount = 0;
+        checkboxes.forEach(checkbox => {
+            const pictureItem = checkbox.closest('.picture-item');
+            if (checkbox.checked) {
+                checkedCount++;
+                pictureItem.classList.add('selected');
+            } else {
+                pictureItem.classList.remove('selected');
+            }
+        });
+        
+        selectedCount.textContent = `${checkedCount} selected`;
+        downloadBtn.disabled = checkedCount === 0;
+        
+        const allChecked = checkedCount === checkboxes.length && checkboxes.length > 0;
+        selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
+    }
+    
+    async function downloadSelected() {
+        const checkboxes = document.querySelectorAll('.picture-checkbox:checked');
+        const pictureNames = Array.from(checkboxes).map(cb => 
+            cb.closest('.picture-item').dataset.pictureName
+        );
+        
+        if (pictureNames.length === 0) {
+            alert('Please select at least one picture to download.');
+            return;
+        }
+        
+        const downloadBtn = document.getElementById('downloadSelectedBtn');
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Preparing Download...';
+        
+        try {
+            // Request ZIP file from backend
+            const response = await fetch(`${API_BASE_URL}/api/pictures/download`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    pictures: pictureNames
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            // Get the ZIP file as blob
+            const blob = await response.blob();
+            
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `photos_${new Date().toISOString().split('T')[0]}.zip`;
+            
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.textContent = `Successfully prepared download of ${pictureNames.length} picture(s)!`;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('main'));
+            
+            setTimeout(() => successDiv.remove(), 3000);
+            
+            // Exit download mode
+            cancelDownloadSelection();
+            
+        } catch (error) {
+            console.error('Error downloading pictures:', error);
+            alert(`Failed to download pictures: ${error.message}`);
+        } finally {
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = '📥 Download Selected';
+        }
+    }
+    
     async function ratePicture(pictureName, rating) {
         try {
             const response = await fetch(`${API_BASE_URL}/api/pictures/rate`, {
@@ -1004,6 +1372,103 @@ def serve_js():
         } catch (error) {
             console.error('Error rating picture:', error);
             alert(`Failed to save rating: ${error.message}`);
+        }
+    }
+
+    function toggleComments(pictureName) {
+        const containerId = `comments-${pictureName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const container = document.getElementById(containerId);
+        const button = container.previousElementSibling.querySelector('.toggle-comments');
+        
+        if (container.style.display === 'none') {
+            container.style.display = 'block';
+            button.textContent = 'Hide Comments';
+        } else {
+            container.style.display = 'none';
+            // Reset button text based on comment count
+            const existingComments = container.querySelectorAll('.comment');
+            button.textContent = existingComments.length > 0 ? `Show ${existingComments.length}` : 'Add Comment';
+        }
+    }
+
+    async function submitComment(pictureName) {
+        const containerId = `comments-${pictureName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const container = document.getElementById(containerId);
+        const nameInput = container.querySelector('.comment-name');
+        const textInput = container.querySelector('.comment-input');
+        const submitBtn = container.querySelector('.submit-comment');
+        
+        const authorName = nameInput.value.trim();
+        const commentText = textInput.value.trim();
+        
+        if (!authorName) {
+            alert('Please enter your name');
+            nameInput.focus();
+            return;
+        }
+        
+        if (!commentText) {
+            alert('Please enter a comment');
+            textInput.focus();
+            return;
+        }
+        
+        // Disable form while submitting
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting...';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/pictures/comment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    picture: pictureName,
+                    author: authorName,
+                    text: commentText
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Comment saved:', result);
+            
+            // Clear the form
+            nameInput.value = '';
+            textInput.value = '';
+            
+            // Add the new comment to the display
+            const existingComments = container.querySelector('.existing-comments');
+            const newComment = document.createElement('div');
+            newComment.className = 'comment';
+            newComment.innerHTML = `
+                <div class="comment-header">
+                    <span class="comment-author">${authorName}</span>
+                    <span class="comment-date">${new Date().toLocaleDateString()}</span>
+                </div>
+                <div class="comment-text">${commentText}</div>
+            `;
+            existingComments.appendChild(newComment);
+            
+            // Update the toggle button text
+            const button = container.previousElementSibling.querySelector('.toggle-comments');
+            const commentCount = existingComments.querySelectorAll('.comment').length;
+            button.textContent = `Show ${commentCount}`;
+            
+            // Show success message
+            alert('Comment posted successfully!');
+            
+        } catch (error) {
+            console.error('Error posting comment:', error);
+            alert(`Failed to post comment: ${error.message}`);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Post Comment';
         }
     }
     """
@@ -1051,16 +1516,28 @@ def get_pictures():
                         metadata = head_response.get('Metadata', {})
                         rating = int(metadata.get('rating', 0)) if metadata.get('rating') else 0
                         original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                        
+                        # Parse comments from metadata
+                        comments = []
+                        comments_json = metadata.get('comments', '')
+                        if comments_json:
+                            try:
+                                comments = json.loads(comments_json)
+                            except json.JSONDecodeError as json_error:
+                                print(f"Error parsing comments JSON for {obj['Key']}: {json_error}")
+                                comments = []
                     except Exception as meta_error:
                         print(f"Error getting metadata for {obj['Key']}: {meta_error}")
                         rating = 0
                         original_name = obj['Key'].split('/')[-1]
+                        comments = []
                     
                     picture_info = {
                         'name': original_name,
                         'date': obj['LastModified'].isoformat(),
                         'url': url,
-                        'rating': rating
+                        'rating': rating,
+                        'comments': comments
                     }
                     pictures.append(picture_info)
                     print(f"Added picture: {picture_info['name']} (rating: {rating})")
@@ -1391,6 +1868,240 @@ def rate_picture(event):
             'statusCode': 500,
             'headers': get_cors_headers(),
             'body': json.dumps({'error': f'Failed to rate picture: {str(e)}'})
+        }
+
+
+def add_comment(event):
+    """Add a comment to a picture by updating S3 object metadata"""
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        data = json.loads(body)
+        picture_name = data.get('picture')
+        author = data.get('author')
+        comment_text = data.get('text')
+        
+        if not picture_name or not author or not comment_text:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'Missing required fields: picture, author, text'})
+            }
+        
+        print(f"Adding comment to picture: {picture_name}")
+        
+        # Find the S3 object key for this picture
+        response = s3_client.list_objects_v2(
+            Bucket=PICTURES_BUCKET,
+            Prefix='pictures/'
+        )
+        
+        target_key = None
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                    # Get metadata to check original name
+                    try:
+                        head_response = s3_client.head_object(
+                            Bucket=PICTURES_BUCKET,
+                            Key=obj['Key']
+                        )
+                        metadata = head_response.get('Metadata', {})
+                        original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                        
+                        if original_name == picture_name:
+                            target_key = obj['Key']
+                            break
+                    except Exception as e:
+                        print(f"Error checking metadata for {obj['Key']}: {e}")
+                        continue
+        
+        if not target_key:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': f'Picture not found: {picture_name}'})
+            }
+        
+        # Get current metadata
+        head_response = s3_client.head_object(
+            Bucket=PICTURES_BUCKET,
+            Key=target_key
+        )
+        current_metadata = head_response.get('Metadata', {})
+        
+        # Parse existing comments
+        existing_comments = []
+        comments_json = current_metadata.get('comments', '')
+        if comments_json:
+            try:
+                existing_comments = json.loads(comments_json)
+            except json.JSONDecodeError as e:
+                print(f"Error parsing existing comments: {e}")
+                existing_comments = []
+        
+        # Add new comment
+        new_comment = {
+            'author': author,
+            'text': comment_text,
+            'date': datetime.now().isoformat()
+        }
+        existing_comments.append(new_comment)
+        
+        # Update metadata with new comments
+        updated_metadata = current_metadata.copy()
+        updated_metadata['comments'] = json.dumps(existing_comments)
+        
+        # Copy object with updated metadata
+        s3_client.copy_object(
+            Bucket=PICTURES_BUCKET,
+            CopySource={'Bucket': PICTURES_BUCKET, 'Key': target_key},
+            Key=target_key,
+            Metadata=updated_metadata,
+            MetadataDirective='REPLACE'
+        )
+        
+        print(f"Comment added successfully to {picture_name}")
+        
+        return {
+            'statusCode': 200,
+            'headers': get_cors_headers(),
+            'body': json.dumps({
+                'message': 'Comment added successfully',
+                'comment': new_comment
+            })
+        }
+        
+    except Exception as e:
+        print(f"Error adding comment: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to add comment: {str(e)}'})
+        }
+
+def download_pictures(event):
+    """Create and return a ZIP file containing selected pictures"""
+    import zipfile
+    import io
+    
+    try:
+        # Parse the request body
+        body = event.get('body', '')
+        if event.get('isBase64Encoded', False):
+            body = base64.b64decode(body).decode('utf-8')
+        
+        data = json.loads(body)
+        picture_names = data.get('pictures', [])
+        
+        if not picture_names:
+            return {
+                'statusCode': 400,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'No pictures specified for download'})
+            }
+        
+        print(f"Creating ZIP for {len(picture_names)} pictures: {picture_names}")
+        
+        # Create ZIP file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Get list of all objects in S3
+            response = s3_client.list_objects_v2(
+                Bucket=PICTURES_BUCKET,
+                Prefix='pictures/'
+            )
+            
+            if 'Contents' not in response:
+                return {
+                    'statusCode': 404,
+                    'headers': get_cors_headers(),
+                    'body': json.dumps({'error': 'No pictures found'})
+                }
+            
+            found_pictures = 0
+            for picture_name in picture_names:
+                # Find the S3 key for this picture name
+                target_key = None
+                for obj in response['Contents']:
+                    if obj['Key'].lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                        try:
+                            # Get metadata to check original name
+                            head_response = s3_client.head_object(
+                                Bucket=PICTURES_BUCKET,
+                                Key=obj['Key']
+                            )
+                            metadata = head_response.get('Metadata', {})
+                            original_name = metadata.get('original-name', obj['Key'].split('/')[-1])
+                            
+                            if original_name == picture_name:
+                                target_key = obj['Key']
+                                break
+                        except Exception as e:
+                            print(f"Error checking metadata for {obj['Key']}: {e}")
+                            continue
+                
+                if target_key:
+                    try:
+                        # Download the picture from S3
+                        print(f"Downloading {target_key} for {picture_name}")
+                        obj_response = s3_client.get_object(
+                            Bucket=PICTURES_BUCKET,
+                            Key=target_key
+                        )
+                        
+                        # Add to ZIP file with original name
+                        zip_file.writestr(picture_name, obj_response['Body'].read())
+                        found_pictures += 1
+                        print(f"Added {picture_name} to ZIP")
+                        
+                    except Exception as e:
+                        print(f"Error downloading {target_key}: {e}")
+                        continue
+                else:
+                    print(f"Picture not found: {picture_name}")
+        
+        if found_pictures == 0:
+            return {
+                'statusCode': 404,
+                'headers': get_cors_headers(),
+                'body': json.dumps({'error': 'None of the requested pictures were found'})
+            }
+        
+        # Get ZIP data
+        zip_buffer.seek(0)
+        zip_data = zip_buffer.getvalue()
+        
+        print(f"Created ZIP file with {found_pictures} pictures, size: {len(zip_data)} bytes")
+        
+        # Return ZIP file as binary response
+        return {
+            'statusCode': 200,
+            'headers': {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': f'attachment; filename="photos_{datetime.now().strftime("%Y%m%d")}.zip"',
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            },
+            'body': base64.b64encode(zip_data).decode('utf-8'),
+            'isBase64Encoded': True
+        }
+        
+    except Exception as e:
+        print(f"Error creating download ZIP: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return {
+            'statusCode': 500,
+            'headers': get_cors_headers(),
+            'body': json.dumps({'error': f'Failed to create download: {str(e)}'})
         }
 
 def upload_picture(event):

@@ -1,17 +1,3 @@
-
-
-# Lambda Layer for dependencies
-resource "aws_lambda_layer_version" "dependencies" {
-  filename   = "${path.module}/../lambda-layer.zip"
-  layer_name = "${local.project_name}-dependencies-${local.environment}"
-
-  compatible_runtimes = ["python3.12"]
-  
-  source_code_hash = filebase64sha256("${path.module}/../lambda-layer.zip")
-
-  description = "Python dependencies for Photos OpenHand application"
-}
-
 # Archive unified Lambda code
 data "archive_file" "unified_lambda" {
   type        = "zip"
@@ -30,7 +16,7 @@ resource "aws_lambda_function" "unified" {
   timeout         = var.lambda_timeout
   memory_size     = var.lambda_memory_size
 
-  layers = [aws_lambda_layer_version.dependencies.arn]
+
 
   environment {
     variables = {
@@ -44,7 +30,7 @@ resource "aws_lambda_function" "unified" {
     Name = "Unified Lambda Frontend Backend"
   })
 
-  depends_on = [aws_lambda_layer_version.dependencies]
+
 }
 
 # Lambda function URL for unified function
