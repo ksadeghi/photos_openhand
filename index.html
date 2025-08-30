@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Picture Gallery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Picture Gallery</h1>
+            <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
+            <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
+            <div class="upload-section">
+                <input type="file" id="fileInput" accept="image/*" multiple>
+                <button id="uploadBtn" onclick="uploadPictures()">Upload Pictures</button>
+                <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()" style="display: none;">📥 Download</button>
+            </div>
+            
+            <div id="deleteSection" class="delete-section" style="display: none;">
+                <button id="selectAllBtn" onclick="toggleSelectAll()">Select All</button>
+                <button id="deleteSelectedBtn" onclick="deleteSelected()" class="delete-btn">🗑️ Delete Selected</button>
+                <button onclick="cancelSelection()" class="cancel-btn">Cancel</button>
+                <span id="selectedCount">0 selected</span>
+            </div>
+            
+            <div id="downloadSection" class="download-section" style="display: none;">
+                <button id="selectAllDownloadBtn" onclick="toggleSelectAllDownload()">Select All</button>
+                <button id="downloadSelectedBtn" onclick="downloadSelected()" class="download-btn">📥 Download Selected</button>
+                <button onclick="cancelDownloadSelection()" class="cancel-btn">Cancel</button>
+                <span id="selectedDownloadCount">0 selected</span>
+            </div>
+        </header>
+
+        <main>
+            <div id="gallery" class="gallery">
+                <!-- Pictures will be loaded here -->
+            </div>
+        </main>
+
+        <!-- Full-size image modal -->
+        <div id="fullSizeModal" class="modal" onclick="closeFullSize()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <span class="close" onclick="closeFullSize()">&times;</span>
+                <img id="fullSizeImage" src="" alt="">
+            </div>
+        </div>
+
+        <!-- Stats modal -->
+        <div id="statsModal" class="modal" onclick="closeStats()">
+            <div class="modal-content stats-content" onclick="event.stopPropagation()">
+                <span class="close" onclick="closeStats()">&times;</span>
+                <h2>Gallery Statistics</h2>
+                <div id="statsContent">
+                    <!-- Stats will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
