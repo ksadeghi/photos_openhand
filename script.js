@@ -1,6 +1,6 @@
 
 // Configuration - Update this with your Lambda function URL
-const API_BASE_URL = 'https://your-lambda-function-url.lambda-url.region.on.aws';
+const API_BASE_URL = 'https://szfzftsjzuuwuuppczhfetu6ye0mipck.lambda-url.us-east-1.on.aws';
 
 // Global variables
 let currentPictures = [];
