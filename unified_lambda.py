@@ -102,9 +102,11 @@ def serve_html():
         <div class="container">
             <header>
                 <h1>Picture Gallery</h1>
-                <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
-                <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
-                <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()">📥 Download</button>
+                <div class="header-buttons">
+                    <button id="selectModeBtn" class="select-mode-button" onclick="enterSelectMode()">✓ Select</button>
+                    <button id="downloadModeBtn" class="download-mode-button" onclick="enterDownloadMode()">📥 Download</button>
+                    <button id="statsButton" class="stats-button" onclick="showStats()">📊 Stats</button>
+                </div>
                 <div class="upload-section">
                     <input type="file" id="fileInput" accept="image/*" multiple>
                     <button onclick="uploadPictures()">Upload Pictures</button>
@@ -190,10 +192,16 @@ def serve_css():
         position: relative;
     }
 
-    .stats-button {
+    .header-buttons {
         position: absolute;
         top: 20px;
         right: 20px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .stats-button, .select-mode-button, .download-mode-button {
         background: #667eea;
         color: white;
         border: none;
@@ -204,49 +212,35 @@ def serve_css():
         font-weight: 500;
         transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        white-space: nowrap;
+        min-width: 80px;
     }
 
-    .stats-button:hover {
-        background: #5a67d8;
+    .stats-button:hover, .select-mode-button:hover, .download-mode-button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
     }
 
+    .stats-button {
+        background: #667eea;
+    }
+
+    .stats-button:hover {
+        background: #5a67d8;
+    }
+
     .select-mode-button {
-        position: absolute;
-        top: 20px;
-        right: 220px;
         background: #48bb78;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
     }
 
     .select-mode-button:hover {
         background: #38a169;
-        transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
     }
 
     .download-mode-button {
-        position: absolute;
-        top: 20px;
-        right: 120px;
         background: #3182ce;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        transition: all 0.3s ease;
         box-shadow: 0 2px 8px rgba(49, 130, 206, 0.3);
     }
 
@@ -753,6 +747,19 @@ def serve_css():
         .gallery {
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
             gap: 15px;
+        }
+        
+        .header-buttons {
+            position: static;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .stats-button, .select-mode-button, .download-mode-button {
+            font-size: 12px;
+            padding: 8px 12px;
+            min-width: 70px;
         }
     }
     """
