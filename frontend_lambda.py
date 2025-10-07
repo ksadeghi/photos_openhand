@@ -218,6 +218,42 @@ def serve_css():
     .picture-date {
         color: #718096;
         font-size: 0.9em;
+        margin-bottom: 15px;
+    }
+
+    .picture-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .select-btn, .download-btn {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        min-width: 70px;
+        text-align: center;
+    }
+
+    .select-btn {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        box-shadow: 0 2px 8px rgba(72, 187, 120, 0.3);
+    }
+
+    .select-btn.selected {
+        background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+        box-shadow: 0 2px 8px rgba(56, 161, 105, 0.4);
+    }
+
+    .download-btn {
+        background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+        box-shadow: 0 2px 8px rgba(66, 153, 225, 0.3);
+    }
+
+    .select-btn:hover, .download-btn:hover {
+        transform: translateY(-1px);
     }
     
     .loading {
@@ -288,11 +324,11 @@ def serve_js():
     const API_BASE_URL = '{backend_url}';
     
     // Load pictures when page loads
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {{
         loadPictures();
-    });
+    }});
     
-    async function loadPictures() {
+    async function loadPictures() {{
         const loading = document.getElementById('loading');
         const gallery = document.getElementById('gallery');
         const dateFilter = document.getElementById('dateFilter').value;
@@ -301,119 +337,123 @@ def serve_js():
         loading.style.display = 'block';
         gallery.innerHTML = '';
         
-        try {
-            let url = `${API_BASE_URL}/pictures`;
+        try {{
+            let url = `${{API_BASE_URL}}/pictures`;
             const params = new URLSearchParams();
             
-            if (dateFilter) {
+            if (dateFilter) {{
                 params.append('date', dateFilter);
-            }
-            if (nameFilter) {
+            }}
+            if (nameFilter) {{
                 params.append('name', nameFilter);
-            }
+            }}
             
-            if (params.toString()) {
+            if (params.toString()) {{
                 url += '?' + params.toString();
-            }
+            }}
             
             const response = await fetch(url);
             const data = await response.json();
             
-            if (data.pictures && data.pictures.length > 0) {
+            if (data.pictures && data.pictures.length > 0) {{
                 displayPictures(data.pictures);
-            } else {
+            }} else {{
                 gallery.innerHTML = '<div class="error">No pictures found</div>';
-            }
-        } catch (error) {
+            }}
+        }} catch (error) {{
             console.error('Error loading pictures:', error);
             gallery.innerHTML = '<div class="error">Error loading pictures. Please try again.</div>';
-        } finally {
+        }} finally {{
             loading.style.display = 'none';
-        }
-    }
+        }}
+    }}
     
-    function displayPictures(pictures) {
+    function displayPictures(pictures) {{
         const gallery = document.getElementById('gallery');
         
-        pictures.forEach(picture => {
+        pictures.forEach(picture => {{
             const card = document.createElement('div');
             card.className = 'picture-card';
             
             card.innerHTML = `
-                <img src="${picture.jpg_url}" alt="${picture.picture_name}" loading="lazy">
+                <img src="${{picture.jpg_url}}" alt="${{picture.picture_name}}" loading="lazy">
                 <div class="picture-info">
-                    <div class="picture-name">${picture.picture_name}</div>
-                    <div class="picture-date">${formatDate(picture.picture_date)}</div>
+                    <div class="picture-name">${{picture.picture_name}}</div>
+                    <div class="picture-date">${{formatDate(picture.picture_date)}}</div>
+                    <div class="picture-actions">
+                        <button class="select-btn" onclick="toggleSelect('${{picture.id}}', this)">Select</button>
+                        <button class="download-btn" onclick="downloadPicture('${{picture.id}}', '${{picture.picture_name}}')">Download</button>
+                    </div>
                 </div>
             `;
             
             gallery.appendChild(card);
-        });
-    }
+        }});
+    }}
     
-    function formatDate(dateString) {
+    function formatDate(dateString) {{
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
+        return date.toLocaleDateString('en-US', {{
             year: 'numeric',
             month: 'long',
             day: 'numeric'
-        });
-    }
+        }});
+    }}
     
-    async function uploadPictures() {
+    async function uploadPictures() {{
         const fileInput = document.getElementById('fileInput');
         const files = fileInput.files;
         
-        if (files.length === 0) {
+        if (files.length === 0) {{
             alert('Please select at least one file to upload');
             return;
-        }
+        }}
         
         const gallery = document.getElementById('gallery');
         
-        for (let i = 0; i < files.length; i++) {
+        for (let i = 0; i < files.length; i++) {{
             const file = files[i];
             
-            if (!file.type.startsWith('image/')) {
-                alert(`File ${file.name} is not an image`);
+            if (!file.type.startsWith('image/')) {{
+                alert(`File ${{file.name}} is not an image`);
                 continue;
-            }
+            }}
             
-            try {
+            try {{
                 await uploadSinglePicture(file);
-                showMessage(`Successfully uploaded ${file.name}`, 'success');
-            } catch (error) {
+                showMessage(`Successfully uploaded ${{file.name}}`, 'success');
+            }} catch (error) {{
                 console.error('Error uploading file:', error);
-                showMessage(`Error uploading ${file.name}`, 'error');
-            }
-        }
+                showMessage(`Error uploading ${{file.name}}`, 'error');
+            }}
+        }}
         
         // Clear the file input and reload pictures
         fileInput.value = '';
-        setTimeout(() => {
+        setTimeout(() => {{
             loadPictures();
-        }, 1000);
-    }
+        }}, 1000);
+    }}
     
-    async function uploadSinglePicture(file) {
+    async function uploadSinglePicture(file) {{
         const formData = new FormData();
         formData.append('file', file);
         formData.append('picture_name', file.name);
         formData.append('picture_date', new Date().toISOString().split('T')[0]);
         
-        const response = await fetch(`${API_BASE_URL}/upload`, {
+        const response = await fetch(`${{API_BASE_URL}}/upload`, {{
             method: 'POST',
             body: formData
-        });
+        }});
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) {{
+            throw new Error(`HTTP error! status: ${{response.status}}`);
+        }}
         
         return await response.json();
-    }
+    }}
     
-    function showMessage(message, type) {
+    function showMessage(message, type) {{
         const container = document.querySelector('.container');
         const messageDiv = document.createElement('div');
         messageDiv.className = type;
@@ -421,27 +461,58 @@ def serve_js():
         
         container.insertBefore(messageDiv, container.firstChild);
         
-        setTimeout(() => {
+        setTimeout(() => {{
             messageDiv.remove();
-        }, 5000);
-    }
+        }}, 5000);
+    }}
+
+    // Selected pictures tracking
+    let selectedPictures = new Set();
+
+    function toggleSelect(pictureId, button) {{
+        if (selectedPictures.has(pictureId)) {{
+            selectedPictures.delete(pictureId);
+            button.textContent = 'Select';
+            button.classList.remove('selected');
+        }} else {{
+            selectedPictures.add(pictureId);
+            button.textContent = 'Selected';
+            button.classList.add('selected');
+        }}
+        updateBulkActions();
+    }}
+
+    function downloadPicture(pictureId, pictureName) {{
+        // Create a temporary link to download the picture
+        const link = document.createElement('a');
+        link.href = `${{API_BASE_URL}}/download/${{pictureId}}`;
+        link.download = pictureName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }}
+
+    function updateBulkActions() {{
+        // You can add bulk action buttons here if needed
+        console.log(`${{selectedPictures.size}} pictures selected`);
+    }}
     
     // Add event listeners for filters
     document.getElementById('dateFilter').addEventListener('change', loadPictures);
     document.getElementById('nameFilter').addEventListener('input', debounce(loadPictures, 500));
     
     // Debounce function to limit API calls
-    function debounce(func, wait) {
+    function debounce(func, wait) {{
         let timeout;
-        return function executedFunction(...args) {
-            const later = () => {
+        return function executedFunction(...args) {{
+            const later = () => {{
                 clearTimeout(timeout);
                 func(...args);
-            };
+            }};
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
-        };
-    }
+        }};
+    }}
     """
     
     return {
